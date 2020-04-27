@@ -3,7 +3,7 @@
 Git Interactions empowers all developers to follow team guidelines and best practices.
 Given the metrics, given the weaknesses and strengths of the team.
 
-## Intallation
+## Installation
 
 Run the following commands:
 
