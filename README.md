@@ -7,7 +7,7 @@ Given the metrics, given the weaknesses and strengths of the team.
 
 Run the following commands:
 
-```properties
+```bash
 composer install
 php artisan key:generate
 php artisan migrate

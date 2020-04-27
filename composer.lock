@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "37565763cc6b6e8585411e9bc8b9d819",
+    "content-hash": "3eff3431a80889e1c7a50fa60b17b16f",
     "packages": [
         {
             "name": "asm89/stack-cors",
@@ -498,6 +498,61 @@
                 "laravel"
             ],
             "time": "2020-03-11T21:05:07+00:00"
+        },
+        {
+            "name": "gmostafa/php-graphql-client",
+            "version": "v1.4.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mghoneimy/php-graphql-client.git",
+                "reference": "7d5f50d9171806a3dc27d1efaf7bb9df12d693da"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mghoneimy/php-graphql-client/zipball/7d5f50d9171806a3dc27d1efaf7bb9df12d693da",
+                "reference": "7d5f50d9171806a3dc27d1efaf7bb9df12d693da",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-readline": "*",
+                "guzzlehttp/guzzle": "^6.3",
+                "php": "^7.1"
+            },
+            "require-dev": {
+                "codacy/coverage": "^1.4",
+                "phpunit/phpunit": "^7.5|^8.0"
+            },
+            "suggest": {
+                "gmostafa/php-graphql-oqm": "To have object-to-query mapping support"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "GraphQL\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Mostafa Ghoneimy",
+                    "email": "emostafagh@gmail.com"
+                }
+            ],
+            "description": "GraphQL client and query builder.",
+            "keywords": [
+                "builder",
+                "client",
+                "graph-ql",
+                "graphql",
+                "php",
+                "query",
+                "query-builder"
+            ],
+            "time": "2019-11-12T20:59:12+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
