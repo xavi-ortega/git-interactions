@@ -1,0 +1,44 @@
+{
+    "repository": {
+        "name": "git-interactions",
+        "slug": "git-interactions",
+        "url": "https://github.com/beyondcode/xavi-ortega/git-interactions",
+        "owner": "xavi-ortega",
+        "description": "Git Interactions empowers all developers to follow team guidelines and best practices."
+    },
+
+    "issues": {
+        "total": 124,
+        "open": 13,
+        "closed": 121,
+        "closed_by_bot": 0,
+        "time_to_close": "40:16"
+    },
+
+    "pullRequests": {
+        "total": 67,
+        "open": 5,
+        "closed": 62,
+        "closed_without_commits": 1,
+        "prc_good_assignees": 60.3,
+        "prc_bad_assignees": 39.7,
+        "prc_good_reviewers": 56.9,
+        "prc_bad_reviewers": 11.1,
+        "prc_unexpected_reviewers": 32,
+        "prc_good_reactions": 89.7,
+        "prc_closed_with_commits": 97.8,
+        "prc_commits_by_assignees": 93.4,
+        "avg_commits_per_pr": 4
+    },
+
+    "contributors": {
+        "total": 15,
+        "avg_files_per_commit": 7,
+        "avg_lines_per_commit": 221,
+        "avg_lines_per_file_per_commit": 23,
+        "avg_pull_request_contributed": 37,
+        "prc_new_code": 35,
+        "prc_rewrite_others_code": 37.3,
+        "prc_rewrite_own_code": 27.7
+    }
+}
