@@ -6,9 +6,27 @@ use App\Repository;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Helpers\GithubApiClient;
+use App\Helpers\GithubRepositoryIssues;
+
+const MAX_ISSUES = 10;
+const MAX_PULL_REQUESTS = 100;
 
 class RepositoriesController extends Controller
 {
+    private $github;
+
+    public function __construct()
+    {
+        $this->github = new GithubApiClient();
+    }
+
+    public function rateLimit()
+    {
+        return response()->json(
+            $this->github->getRateLimit()
+        );
+    }
+
     public function report(Request $request)
     {
         $request->validate([
@@ -16,14 +34,28 @@ class RepositoriesController extends Controller
             'owner' => 'required'
         ]);
 
-        $github = new GithubApiClient();
+        $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        $repository = Repository::where('name', $request->name)->where('owner', $request->owner)->first();
+        $repositoryMetrics = $this->github->getRepositoryMetrics([
+            'name' => $request->name,
+            'owner' => $request->owner
+        ]);
+
+        $repositoryIssues = $this->getRepositoryIssues($request->name, $request->owner, $repositoryMetrics->issues->totalCount);
+
+        return response()->json($repositoryIssues->get()->count());
+    }
+
+    // REPOSITORY INFO
+
+    private function getOrCreateRepository(string $name, string $owner): Repository
+    {
+        $repository = Repository::where('name', $name)->where('owner', $owner)->first();
 
         if ($repository === null) {
-            $repositoryInfo = $github->getRepositoryInfo([
-                'name' => $request->name,
-                'owner' => $request->owner
+            $repositoryInfo = $this->github->getRepositoryInfo([
+                'name' => $name,
+                'owner' => $owner
             ]);
 
             $repository = Repository::create([
@@ -35,6 +67,69 @@ class RepositoriesController extends Controller
             ]);
         }
 
-        return response()->json($repository);
+        return $repository;
+    }
+
+    // REPOSITORY ISSUES
+
+    private function getRepositoryIssues(string $name, string $owner, int $total): GithubRepositoryIssues
+    {
+        if ($total > 100) {
+            $repositoryIssues = $this->getRepositoryIssuesOver100($name, $owner, $total);
+        } else {
+            $repositoryIssues = $this->getRepositoryIssuesUnder100($name, $owner, $total);
+        }
+
+        return $repositoryIssues;
+    }
+
+    private function getRepositoryIssuesUnder100(string $name, string $owner, int $total): GithubRepositoryIssues
+    {
+        $repositoryIssues = new GithubRepositoryIssues(
+            $this->github->getRepositoryIssues([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => $total
+            ])->nodes
+        );
+
+        return $repositoryIssues;
+    }
+
+    private function getRepositoryIssuesOver100(string $name, string $owner, int $total): GithubRepositoryIssues
+    {
+        $repositoryIssues = new GithubRepositoryIssues();
+
+        $pages = $total / MAX_ISSUES + 1;
+        $lastPageCount = $total % MAX_ISSUES;
+
+        $after = null;
+
+        for ($i = 1; $i < 5; $i++) {
+            $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => MAX_ISSUES,
+                'after' => $after
+            ]);
+
+            $repositoryIssues->add(
+                $paginatedIssues->nodes
+            );
+
+            $after = $paginatedIssues->pageInfo->endCursor;
+        }
+
+        $repositoryIssues->add(
+            $this->github->getRepositoryIssuesPaginated([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => $lastPageCount,
+                'after' => $after
+            ])->nodes
+        );
+
+
+        return $repositoryIssues;
     }
 }
