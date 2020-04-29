@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use GraphQL\{Client, Query, Variable};
+use GuzzleHttp\Client as GuzzleClient;
 
 /**
  * GithubApiClient
@@ -12,11 +13,19 @@ use GraphQL\{Client, Query, Variable};
 class GithubApiClient
 {
     /**
-     * client
+     * graphql client for queries
      *
      * @var GraphQL\Client
      */
     private $client;
+
+    /**
+     * guzzle client for http requests
+     *
+     * @var GuzzleHttp\Client
+     */
+    private $guzzleClient;
+
 
     public function __construct()
     {
@@ -27,6 +36,15 @@ class GithubApiClient
             ]
 
         );
+
+        $this->guzzleClient = new GuzzleClient([
+            'base_uri' => 'https://api.github.com',
+            'headers' => [
+                'Authorization' => 'Bearer ' . env('GITHUB_ACCESS_TOKEN'),
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/vnd.github.v3+json'
+            ]
+        ]);
     }
 
     /**
@@ -91,26 +109,22 @@ class GithubApiClient
      */
     public function getRepositoryMetrics(array $params)
     {
-        $query = (new Query('repository'))
-            ->setVariables(
-                [
-                    new Variable('name', 'String', true),
-                    new Variable('owner', 'String', true)
-                ]
-            )
-            ->setArguments(['name' => '$name', 'owner' => '$owner'])
-            ->setSelectionSet(
-                [
-                    (new Query('issues'))->setSelectionSet([
-                        'totalCount',
-                    ]),
-                    (new Query('pullRequests'))->setSelectionSet([
-                        'totalCount',
-                    ]),
-                ]
-            );
-
-        return $this->run($query, $params)->getData()->repository;
+        $query = <<<QUERY
+        query {
+            repository(owner: "angular", name: "angular") {
+                issues (first: 1) {
+                    totalCount
+                },
+                pullRequests( first: 1) {
+                    totalCount
+                },
+                branches: refs(first: 1, refPrefix: "refs/heads/") {
+                    totalCount
+                }
+            }
+        }
+        QUERY;
+        return $this->runRaw($query, $params)->getData()->repository;
     }
 
     /**
@@ -202,6 +216,275 @@ class GithubApiClient
         QUERY;
 
         return $this->runRaw($query, $params)->getData()->repository->issues;
+    }
+
+    /**
+     * Gets repository pull requests
+     *
+     * cost: $first / 10
+     *
+     * @param array $params
+     * @return Object
+     */
+    public function getRepositoryPullRequests(array $params)
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$first: Int!) {
+            repository(owner: \$owner, name: \$name) {
+                pullRequests (first: \$first) {
+                    nodes {
+                        closed,
+                        closedAt,
+                        assignees (first: 10) {
+                            nodes {
+                                login
+                            }
+                        },
+
+                        reviews (first: 10) {
+                            nodes {
+                                author {
+                                    login
+                                },
+
+                                reactions (first: 1) {
+                                    nodes {
+                                        content
+                                    }
+                                }
+                            }
+                        },
+
+                        suggestedReviewers {
+                            reviewer {
+                                login
+                            }
+                        },
+
+                        commits {
+                            totalCount
+                        }
+                    }
+
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params)->getData()->repository->pullRequests;
+    }
+
+    /**
+     * Gets repository pull requests paginated
+     *
+     * cost: 9
+     *
+     * @param array $params
+     * @return Object
+     */
+    public function getRepositoryPullRequestsPaginated(array $params)
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
+            repository(owner: \$owner, name: \$name) {
+                pullRequests (first: \$first, after: \$after) {
+                    pageInfo {
+                        endCursor
+                    },
+                    nodes {
+                        closed,
+                        closedAt,
+                        assignees (first: 10) {
+                            nodes {
+                                login
+                            }
+                        },
+
+                        reviews (first: 10) {
+                            nodes {
+                                author {
+                                    login
+                                },
+
+                                reactions (first: 1) {
+                                    nodes {
+                                        content
+                                    }
+                                }
+                            }
+                        },
+
+                        suggestedReviewers {
+                            reviewer {
+                                login
+                            }
+                        },
+
+                        commits {
+                            totalCount
+                        }
+                    }
+
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params)->getData()->repository->pullRequests;
+    }
+
+    /**
+     * Gets repository branches
+     *
+     * cost: 1
+     *
+     * @param array $params
+     * @return Object
+     */
+    public function getRepositoryBranches(array $params)
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
+            repository(owner: \$owner, name: \$name) {
+                branches: refs(first: \$first, refPrefix: "refs/heads/") {
+                    nodes {
+                        name,
+                        commits: target {
+                            ... on Commit {
+                                history (first: 1) {
+                                    totalCount
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params)->getData()->repository->branches;
+    }
+
+    /**
+     * Gets repository branches paginated
+     *
+     * cost: 1
+     *
+     * @param array $params
+     * @return Object
+     */
+    public function getRepositoryBranchesPaginated(array $params)
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
+            repository(owner: \$owner, name: \$name) {
+                branches: refs(first: \$first, refPrefix: "refs/heads/", after: \$after) {
+                    pageInfo {
+                        endCursor
+                    },
+                    nodes {
+                        name,
+                        commits: target {
+                            ... on Commit {
+                                history (first: 1) {
+                                    totalCount
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params)->getData()->repository->branches;
+    }
+
+    /**
+     * Gets repository commits
+     *
+     * cost: 1
+     *
+     * @param array $params
+     * @return void
+     */
+    public function getRepositoryCommitsByBranch(array $params)
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$first: Int!) {
+            repository(owner: \$owner, name: \$name) {
+                branch: ref(qualifiedName: \$branch) {
+                    target {
+                        ... on Commit {
+                            history(first: \$first) {
+                                nodes {
+                                    oid,
+                                    url,
+                                    changedFiles,
+                                    additions,
+                                    deletions,
+                                    committedDate,
+                                    author {
+                                        name
+                                        user {
+                                            login
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params);
+    }
+
+    /**
+     * Gets repository commits
+     *
+     * cost: 1
+     *
+     * @param array $params
+     * @return void
+     */
+    public function getRepositoryCommitsByBranchPaginated(array $params)
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
+            repository(owner: \$owner, name: \$name) {
+                branch: ref(qualifiedName: \$branch) {
+                    target {
+                        ... on Commit {
+                            history(first: \$first, after: \$after) {
+                                pageInfo {
+                                    endCursor
+                                },
+                                nodes {
+                                    oid,
+                                    url,
+                                    changedFiles,
+                                    additions,
+                                    deletions,
+                                    committedDate,
+                                    author {
+                                        name
+                                        user {
+                                            login
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params);
     }
 
     /**

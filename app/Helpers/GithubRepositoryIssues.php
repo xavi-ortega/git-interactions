@@ -13,12 +13,12 @@ class GithubRepositoryIssues
         $this->collection = collect($issues);
     }
 
-    public function add($issues)
+    public function add(array $issues)
     {
         $this->collection = $this->collection->merge($issues);
     }
 
-    public function get()
+    public function get(): Collection
     {
         return $this->collection;
     }

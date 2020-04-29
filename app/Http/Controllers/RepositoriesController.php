@@ -7,9 +7,10 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Helpers\GithubApiClient;
 use App\Helpers\GithubRepositoryIssues;
+use App\Helpers\GithubRepositoryPullRequests;
 
-const MAX_ISSUES = 10;
-const MAX_PULL_REQUESTS = 100;
+const MAX_ISSUES = 100;
+const MAX_PULL_REQUESTS = 90;
 
 class RepositoriesController extends Controller
 {
@@ -42,8 +43,13 @@ class RepositoriesController extends Controller
         ]);
 
         $repositoryIssues = $this->getRepositoryIssues($request->name, $request->owner, $repositoryMetrics->issues->totalCount);
+        $repositoryPullRequests = $this->getRepositoryPullRequests($request->name, $request->owner, $repositoryMetrics->issues->totalCount);
 
-        return response()->json($repositoryIssues->get()->count());
+        return response()->json([
+            'repo' => $repository,
+            'issues' => $repositoryIssues->get()->count(),
+            'pullRequests' => $repositoryPullRequests->get()->count()
+        ]);
     }
 
     // REPOSITORY INFO
@@ -105,7 +111,7 @@ class RepositoriesController extends Controller
 
         $after = null;
 
-        for ($i = 1; $i < 5; $i++) {
+        for ($i = 1; $i < $pages; $i++) {
             $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
                 'name' => $name,
                 'owner' => $owner,
@@ -131,5 +137,68 @@ class RepositoriesController extends Controller
 
 
         return $repositoryIssues;
+    }
+
+    // REPOSITORY PULL REQUESTs
+
+    private function getRepositoryPullRequests(string $name, string $owner, int $total): GithubRepositoryPullRequests
+    {
+        if ($total > 100) {
+            $repositoryPullRequests = $this->getRepositoryPullRequestsOver100($name, $owner, $total);
+        } else {
+            $repositoryPullRequests = $this->getRepositoryPullRequestsUnder100($name, $owner, $total);
+        }
+
+        return $repositoryPullRequests;
+    }
+
+    private function getRepositoryPullRequestsUnder100(string $name, string $owner, int $total): GithubRepositoryPullRequests
+    {
+        $repositoryPullRequests = new GithubRepositoryPullRequests(
+            $this->github->getRepositoryPullRequests([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => $total
+            ])->nodes
+        );
+
+        return $repositoryPullRequests;
+    }
+
+    private function getRepositoryPullRequestsOver100(string $name, string $owner, int $total): GithubRepositoryPullRequests
+    {
+        $repositoryPullRequests = new GithubRepositoryPullRequests();
+
+        $pages = $total / MAX_PULL_REQUESTS + 1;
+        $lastPageCount = $total % MAX_PULL_REQUESTS;
+
+        $after = null;
+
+        for ($i = 1; $i < $pages; $i++) {
+            $paginatedPullRequests = $this->github->getRepositoryPullRequestsPaginated([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => MAX_ISSUES,
+                'after' => $after
+            ]);
+
+            $repositoryPullRequests->add(
+                $paginatedPullRequests->nodes
+            );
+
+            $after = $paginatedPullRequests->pageInfo->endCursor;
+        }
+
+        $repositoryPullRequests->add(
+            $this->github->getRepositoryPullRequestsPaginated([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => $lastPageCount,
+                'after' => $after
+            ])->nodes
+        );
+
+
+        return $repositoryPullRequests;
     }
 }
