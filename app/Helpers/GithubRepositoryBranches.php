@@ -21,12 +21,12 @@ class GithubRepositoryBranches
 
     public function addCommits(string $branchName, array $commits)
     {
-        $branch = $this->collection->where('name', $branchName);
+        $branch = $this->collection->where('name', $branchName)->first();
 
-        if (property_exists($branch->commits, 'all')) {
-            $branch->commits->all->merge($commits);
+        if (property_exists($branch->commits->history, 'all')) {
+            $branch->commits->history->all = $branch->commits->history->all->merge($commits);
         } else {
-            $branch->commits->all = collect($commits);
+            $branch->commits->history->all = collect($commits);
         }
     }
 
@@ -37,7 +37,7 @@ class GithubRepositoryBranches
 
     public function getCommits(string $branchName): Collection
     {
-        $branch = $this->collection->where('name', $branchName);
+        $branch = $this->collection->where('name', $branchName)->first();
 
         return $branch->commits->all ?? collect([]);
     }

@@ -110,8 +110,8 @@ class GithubApiClient
     public function getRepositoryMetrics(array $params)
     {
         $query = <<<QUERY
-        query {
-            repository(owner: "angular", name: "angular") {
+        query (\$owner: String!, \$name: String!){
+            repository(owner: \$owner, name: \$name) {
                 issues (first: 1) {
                     totalCount
                 },
@@ -133,7 +133,7 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return array
      */
     public function getRepositoryIssues(array $params)
     {
@@ -168,7 +168,7 @@ class GithubApiClient
         }
         QUERY;
 
-        return $this->runRaw($query, $params)->getData()->repository->issues;
+        return $this->runRaw($query, $params)->getData()->repository->issues->nodes;
     }
 
     /**
@@ -224,7 +224,7 @@ class GithubApiClient
      * cost: $first / 10
      *
      * @param array $params
-     * @return Object
+     * @return array
      */
     public function getRepositoryPullRequests(array $params)
     {
@@ -271,7 +271,7 @@ class GithubApiClient
         }
         QUERY;
 
-        return $this->runRaw($query, $params)->getData()->repository->pullRequests;
+        return $this->runRaw($query, $params)->getData()->repository->pullRequests->nodes;
     }
 
     /**
@@ -339,12 +339,12 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return array
      */
     public function getRepositoryBranches(array $params)
     {
         $query = <<<QUERY
-        query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
+        query (\$owner: String!, \$name: String!, \$first: Int!) {
             repository(owner: \$owner, name: \$name) {
                 branches: refs(first: \$first, refPrefix: "refs/heads/") {
                     nodes {
@@ -362,7 +362,7 @@ class GithubApiClient
         }
         QUERY;
 
-        return $this->runRaw($query, $params)->getData()->repository->branches;
+        return $this->runRaw($query, $params)->getData()->repository->branches->nodes;
     }
 
     /**
@@ -401,20 +401,20 @@ class GithubApiClient
     }
 
     /**
-     * Gets repository commits
+     * Gets repository commits by branch
      *
      * cost: 1
      *
      * @param array $params
-     * @return void
+     * @return array
      */
     public function getRepositoryCommitsByBranch(array $params)
     {
         $query = <<<QUERY
-        query (\$owner: String!, \$name: String!, \$first: Int!) {
+        query (\$owner: String!, \$name: String!, \$branch: String!, \$first: Int!) {
             repository(owner: \$owner, name: \$name) {
                 branch: ref(qualifiedName: \$branch) {
-                    target {
+                    commits: target {
                         ... on Commit {
                             history(first: \$first) {
                                 nodes {
@@ -439,24 +439,24 @@ class GithubApiClient
         }
         QUERY;
 
-        return $this->runRaw($query, $params);
+        return $this->runRaw($query, $params)->getData()->repository->branch->commits->history->nodes;
     }
 
     /**
-     * Gets repository commits
+     * Gets repository commits by branch paginated
      *
      * cost: 1
      *
      * @param array $params
-     * @return void
+     * @return Object
      */
     public function getRepositoryCommitsByBranchPaginated(array $params)
     {
         $query = <<<QUERY
-        query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
+        query (\$owner: String!, \$name: String!, \$branch: String!, \$first: Int!, \$after: String = null) {
             repository(owner: \$owner, name: \$name) {
                 branch: ref(qualifiedName: \$branch) {
-                    target {
+                    commits: target {
                         ... on Commit {
                             history(first: \$first, after: \$after) {
                                 pageInfo {
@@ -484,7 +484,7 @@ class GithubApiClient
         }
         QUERY;
 
-        return $this->runRaw($query, $params);
+        return $this->runRaw($query, $params)->getData()->repository->branch->commits->history;
     }
 
     /**
