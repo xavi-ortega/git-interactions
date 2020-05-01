@@ -38,7 +38,7 @@ class GithubRepositoryBranchService
             ])
         );
 
-        $branchNames = $repositoryBranches->get()->pluck('commits.history.totalCount', 'name');
+        $branchNames = $repositoryBranches->get()->pluck('totalCommits', 'name');
 
         foreach ($branchNames as $branchName => $totalCommits) {
             $commits = $this->getBranchCommits($name, $owner, $totalCommits, $branchName);
@@ -82,7 +82,7 @@ class GithubRepositoryBranchService
             ])->nodes
         );
 
-        $branchNames = $repositoryBranches->get()->pluck('commits.history.totalCount', 'name');
+        $branchNames = $repositoryBranches->get()->pluck('totalCommits', 'name');
 
         foreach ($branchNames as $branchName => $totalCommits) {
             $commits = $this->getBranchCommits($name, $owner, $totalCommits, $branchName);

@@ -144,7 +144,7 @@ class GithubApiClient
                     nodes {
                         author {
                             login
-                        }
+                        },
                         closed,
                         createdAt,
                         closedAt,
@@ -191,7 +191,7 @@ class GithubApiClient
                     nodes {
                         author {
                             login
-                        }
+                        },
                         closed,
                         createdAt,
                         closedAt,
@@ -233,11 +233,30 @@ class GithubApiClient
             repository(owner: \$owner, name: \$name) {
                 pullRequests (first: \$first) {
                     nodes {
+                        author {
+                            login
+                        },
                         closed,
+                        merged,
+                        createdAt,
                         closedAt,
+                        mergedAt,
+                        mergedBy {
+                            login
+                        },
                         assignees (first: 10) {
                             nodes {
                                 login
+                            }
+                        },
+
+                        closedEvent: timelineItems(last: 1, itemTypes: CLOSED_EVENT) {
+                            nodes {
+                                ... on ClosedEvent {
+                                    actor {
+                                        login
+                                    }
+                                }
                             }
                         },
 
@@ -292,11 +311,30 @@ class GithubApiClient
                         endCursor
                     },
                     nodes {
+                        author {
+                            login
+                        },
                         closed,
+                        merged,
+                        createdAt,
                         closedAt,
+                        mergedAt,
+                        mergedBy {
+                            login
+                        },
                         assignees (first: 10) {
                             nodes {
                                 login
+                            }
+                        },
+
+                        closedEvent: timelineItems(last: 1, itemTypes: CLOSED_EVENT) {
+                            nodes {
+                                ... on ClosedEvent {
+                                    actor {
+                                        login
+                                    }
+                                }
                             }
                         },
 

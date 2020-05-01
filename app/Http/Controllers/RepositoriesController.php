@@ -58,12 +58,12 @@ class RepositoriesController extends Controller
 
         return response()->json([
             'repo' => $repository,
-            'issues' => $repositoryIssues->get()->count(),
-            'pullRequests' => $repositoryPullRequests->get()->count(),
+            'issues' => $repositoryIssues->get()->first(),
+            'pullRequests' => $repositoryPullRequests->get()->first(),
             'branches' => $repositoryBranches->get()->map(function ($branch) {
                 return [
                     'name' => $branch->name,
-                    'commits' => $branch->commits->history->all->count()
+                    'commits' => $branch->commits->first()
                 ];
             })
         ]);

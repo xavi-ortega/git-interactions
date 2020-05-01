@@ -10,12 +10,16 @@ class GithubRepositoryBranches
 
     public function __construct(array $branches = [])
     {
-        $this->collection = collect($branches);
+        $this->collection = collect(
+            $this->formatBranches($branches)
+        );
     }
 
     public function add(array $branches)
     {
-        $this->collection = $this->collection->merge($branches);
+        $this->collection = $this->collection->merge(
+            $this->formatBranches($branches)
+        );
     }
 
 
@@ -23,11 +27,7 @@ class GithubRepositoryBranches
     {
         $branch = $this->collection->where('name', $branchName)->first();
 
-        if (property_exists($branch->commits->history, 'all')) {
-            $branch->commits->history->all = $branch->commits->history->all->merge($commits);
-        } else {
-            $branch->commits->history->all = collect($commits);
-        }
+        $branch->commits = $branch->commits->merge($commits);
     }
 
     public function get(): Collection
@@ -40,5 +40,16 @@ class GithubRepositoryBranches
         $branch = $this->collection->where('name', $branchName)->first();
 
         return $branch->commits->all ?? collect([]);
+    }
+
+    private function formatBranches(array $rawBranches)
+    {
+        return array_map(function ($branch) {
+            return (object) [
+                'name' => $branch->name,
+                'totalCommits' => $branch->commits->history->totalCount,
+                'commits' => collect([])
+            ];
+        }, $rawBranches);
     }
 }
