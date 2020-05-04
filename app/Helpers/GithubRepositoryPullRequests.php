@@ -31,10 +31,11 @@ class GithubRepositoryPullRequests
     {
         return array_map(function ($pullRequest) {
             $closedBy = array_map(function ($closedEvent) {
-                return $closedEvent->actor->login;
+                return isset($closedEvent->actor) ? $closedEvent->actor->login : null;
             }, $pullRequest->closedEvent->nodes);
 
             return (object) [
+                'id' => $pullRequest->id,
                 'author' => isset($pullRequest->author) ? $pullRequest->author->login : null,
                 'closed' => $pullRequest->closed,
                 'merged' => $pullRequest->merged,
@@ -46,13 +47,8 @@ class GithubRepositoryPullRequests
                 'assignees' => array_map(function ($assignee) {
                     return $assignee->login;
                 },  $pullRequest->assignees->nodes),
-                'reviews' => array_map(function ($review) {
-                    $reaction = count($review->reactions->nodes) ? $review->reactions->nodes[0]->content : null;
-
-                    return (object) [
-                        'author' => $review->author->login,
-                        'reaction' => $reaction
-                    ];
+                'reviewers' => array_map(function ($review) {
+                    return  isset($review->author) ? $review->author->login : null;
                 }, $pullRequest->reviews->nodes),
                 'suggestedReviewers' => array_map(function ($suggestedReviewer) {
                     return $suggestedReviewer->reviewer->login;

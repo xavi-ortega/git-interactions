@@ -21,7 +21,7 @@ class CreateIssueReportsTable extends Migration
             $table->bigInteger('open');
             $table->bigInteger('closed');
             $table->bigInteger('closed_by_bot');
-            $table->time('time_to_close');
+            $table->time('avg_time_to_close');
 
             $table->timestamps();
         });

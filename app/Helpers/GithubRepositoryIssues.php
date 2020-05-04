@@ -31,10 +31,11 @@ class GithubRepositoryIssues
     {
         return array_map(function ($issue) {
             $closedBy = array_map(function ($closedEvent) {
-                return $closedEvent->actor->login;
+                return isset($closedEvent->actor) ? $closedEvent->actor->login : null;
             }, $issue->closedEvent->nodes);
 
             return (object) [
+                'id' => $issue->id,
                 'author' => isset($issue->author) ? $issue->author->login : null,
                 'closed' => $issue->closed,
                 'createdAt' => $issue->createdAt,

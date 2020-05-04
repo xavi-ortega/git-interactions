@@ -142,6 +142,7 @@ class GithubApiClient
             repository(owner: \$owner, name: \$name) {
                 issues(first: \$first) {
                     nodes {
+                        id,
                         author {
                             login
                         },
@@ -189,6 +190,7 @@ class GithubApiClient
                         endCursor
                     },
                     nodes {
+                        id,
                         author {
                             login
                         },
@@ -221,7 +223,7 @@ class GithubApiClient
     /**
      * Gets repository pull requests
      *
-     * cost: $first / 10
+     * cost: 1
      *
      * @param array $params
      * @return array
@@ -233,6 +235,7 @@ class GithubApiClient
             repository(owner: \$owner, name: \$name) {
                 pullRequests (first: \$first) {
                     nodes {
+                        id,
                         author {
                             login
                         },
@@ -264,12 +267,6 @@ class GithubApiClient
                             nodes {
                                 author {
                                     login
-                                },
-
-                                reactions (first: 1) {
-                                    nodes {
-                                        content
-                                    }
                                 }
                             }
                         },
@@ -296,7 +293,7 @@ class GithubApiClient
     /**
      * Gets repository pull requests paginated
      *
-     * cost: 9
+     * cost: 1
      *
      * @param array $params
      * @return Object
@@ -311,6 +308,7 @@ class GithubApiClient
                         endCursor
                     },
                     nodes {
+                        id,
                         author {
                             login
                         },
@@ -342,12 +340,6 @@ class GithubApiClient
                             nodes {
                                 author {
                                     login
-                                },
-
-                                reactions (first: 1) {
-                                    nodes {
-                                        content
-                                    }
                                 }
                             }
                         },

@@ -12,7 +12,7 @@
         "open": 13,
         "closed": 121,
         "closed_by_bot": 0,
-        "time_to_close": "40:16"
+        "avg_time_to_close": "40:16"
     },
 
     "pullRequests": {
@@ -20,15 +20,16 @@
         "open": 5,
         "closed": 62,
         "closed_without_commits": 1,
-        "prc_good_assignees": 60.3,
-        "prc_bad_assignees": 39.7,
-        "prc_good_reviewers": 56.9,
-        "prc_bad_reviewers": 11.1,
-        "prc_unexpected_reviewers": 32,
-        "prc_good_reactions": 89.7,
         "prc_closed_with_commits": 97.8,
         "prc_commits_by_assignees": 93.4,
-        "avg_commits_per_pr": 4
+        "avg_prc_good_assignees": 60.3,
+        "avg_prc_bad_assignees": 39.7,
+        "avg_prc_good_reviewers": 56.9,
+        "avg_prc_bad_reviewers": 11.1,
+        "avg_prc_unexpected_reviewers": 32,
+        "avg_commits_per_pr": 4,
+        "avg_time_to_close": "40:16",
+        "avg_time_to_merge": "40:16"
     },
 
     "contributors": {
