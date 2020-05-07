@@ -27,7 +27,9 @@ class GithubRepositoryBranches
     {
         $branch = $this->collection->where('name', $branchName)->first();
 
-        $branch->commits = $branch->commits->merge($commits);
+        $branch->commits = $branch->commits->merge(
+            $this->formatCommits($commits)
+        );
     }
 
     public function get(): Collection
@@ -51,5 +53,26 @@ class GithubRepositoryBranches
                 'commits' => collect([])
             ];
         }, $rawBranches);
+    }
+
+    private function formatCommits(array $rawCommits)
+    {
+        return array_map(function ($commit) {
+            $author = isset($commit->author) && isset($commit->author->user) ? $commit->author->user->login : null;
+
+            return (object) [
+                'id' => $commit->oid,
+                'url' => $commit->url,
+                'changedFiles' => $commit->changedFiles,
+                'additions' => $commit->additions,
+                'deletions' => $commit->deletions,
+                'committedAt' => $commit->committedDate,
+                'pushedAt' => $commit->pushedDate,
+                'author' => $author,
+                'pullRequests' => array_map(function ($pullRequest) {
+                    return $pullRequest->id;
+                }, $commit->associatedPullRequests->nodes),
+            ];
+        }, $rawCommits);
     }
 }

@@ -10,6 +10,8 @@ const ACTION_MERGE = 'merge';
 const ACTION_ASSIGN = 'assign';
 const ACTION_SUGGESTED_REVIEWER = 'suggested-reviewer';
 const ACTION_REVIEW = 'review';
+const ACTION_COMMIT_PR = 'commit-pr';
+const ACTION_COMMIT_BRANCH = 'commit-branch';
 
 class GithubRepositoryContributors
 {
@@ -18,11 +20,6 @@ class GithubRepositoryContributors
     public function __construct(array $contributors = [])
     {
         $this->collection = collect($contributors);
-    }
-
-    public function get(): Collection
-    {
-        return $this->collection;
     }
 
     public function registerIssueAction(string $contributorName, string $action, Object $issueInfo)
@@ -44,6 +41,7 @@ class GithubRepositoryContributors
             }
         } else {
             $issue = (object) [
+                'id' => $issueInfo->id,
                 'openedByHim' => false,
                 'closedByHim' => false,
                 'timeToClose' => 0
@@ -102,6 +100,7 @@ class GithubRepositoryContributors
             }
         } else {
             $pullRequest = (object) [
+                'id' => $pullRequestInfo->id,
                 'openedByHim'  => false,
                 'closedByHim' => false,
                 'mergedByHim' => false,
@@ -145,83 +144,88 @@ class GithubRepositoryContributors
         $this->collection->put($contributorName, $contributor);
     }
 
-    public function getContributorsAssigned()
+    public function registerCommitAction(string $contributorName, string $action, Object $commitInfo)
     {
-        return $this->collection->keys()->reduce(function ($contributors, $contributorName) {
-            $contributor = $this->collection->get($contributorName);
+        $contributor = $this->getOrCreateContributor($contributorName);
 
-            $assignedSomewhere = $contributor->pullRequests->some(function ($_, $pullRequest) {
-                return $pullRequest->assignedTo;
-            });
+        $commit = $contributor->commits->get($commitInfo->id);
 
-            if ($assignedSomewhere) {
-                $contributors[] = $contributorName;
+        if ($commit !== null) {
+            switch ($action) {
+                case ACTION_COMMIT_PR:
+                    $commit->pullRequest = $commitInfo->pullRequest;
+                    break;
+
+                case ACTION_COMMIT_BRANCH:
+                    $commit->pullRequest = $commitInfo->branch;
+                    break;
             }
+        } else {
+            $commit = (object) [
+                'id' => $commitInfo->id,
+                'pullRequest' => 0,
+                'branch' => 0,
+                'changedFiles' => $commitInfo->changedFiles,
+                'changedLines' => $commitInfo->changedLines,
+                'linesPerFile' => round($commitInfo->changedLines / $commitInfo->changedFiles),
+                'timeToPush' => $commitInfo->timeToPush
+            ];
 
-            return $contributors;
-        });
+            switch ($action) {
+                case ACTION_COMMIT_PR:
+                    $commit->pullRequest = $commitInfo->pullRequest;
+                    break;
+
+                case ACTION_COMMIT_BRANCH:
+                    $commit->pullRequest = $commitInfo->branch;
+                    break;
+            }
+        }
+
+        $contributor->commits->put($commitInfo->id, $commit);
+
+        $this->collection->put($contributorName, $contributor);
     }
 
-    public function getContributorsReviewed()
+    public function get(): Collection
     {
-        return $this->collection->keys()->reduce(function ($contributors, $contributorName) {
-            $contributor = $this->collection->get($contributorName);
-
-            $reviewedSomewhere = $contributor->pullRequests->some(function ($_, $pullRequest) {
-                return $pullRequest->reviewedByHim;
-            });
-
-            if ($reviewedSomewhere) {
-                $contributors[] = $contributorName;
-            }
-
-            return $contributors;
-        });
+        return $this->collection;
     }
 
-    public function getContributorsSuggestedForReview()
+    public function getContributorsAssignedTo(string $pullRequestId): Collection
     {
-        return $this->collection->keys()->reduce(function ($contributors, $contributorName) {
-            $contributor = $this->collection->get($contributorName);
-
-            $suggestedSomewhere = $contributor->pullRequests->some(function ($_, $pullRequest) {
-                return $pullRequest->suggestedReviewerTo;
-            });
-
-            if ($suggestedSomewhere) {
-                $contributors[] = $contributorName;
-            }
-
-            return $contributors;
-        });
-    }
-
-    public function getContributorsAssignedTo(string $pullRequestId)
-    {
-        return $this->collection->keys()->reduce(function ($contributors, $contributorName) use ($pullRequestId) {
-            $contributor = $this->collection->get($contributorName);
+        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
             $pullRequest = $contributor->pullRequests->get($pullRequestId);
 
-            if ($pullRequest->assignedTo) {
-                $contributors[] = $contributorName;
-            }
-
-            return $contributors;
-        });
+            return $pullRequest !== null && $pullRequest->assignedTo;
+        })->keys();
     }
 
-    public function getContributorsReviewedTo(string $pullRequestId)
+    public function getContributorsCommitedTo(string $pullRequestId): Collection
     {
-        return $this->collection->keys()->reduce(function ($contributors, $contributorName) use ($pullRequestId) {
-            $contributor = $this->collection->get($contributorName);
+        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
+            return $contributor->commits->some(function ($commit) use ($pullRequestId) {
+                return $commit->pullRequest === $pullRequestId;
+            });
+        })->keys();
+    }
+
+    public function getContributorsSuggestedForReviewTo(string $pullRequestId): Collection
+    {
+        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
             $pullRequest = $contributor->pullRequests->get($pullRequestId);
 
-            if ($pullRequest->reviewedByHim) {
-                $contributors[] = $contributorName;
-            }
+            return $pullRequest !== null && $pullRequest->suggestedReviewerTo;
+        })->keys();
+    }
 
-            return $contributors;
-        });
+    public function getContributorsReviewedTo(string $pullRequestId): Collection
+    {
+        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
+            $pullRequest = $contributor->pullRequests->get($pullRequestId);
+
+            return $pullRequest !== null && $pullRequest->reviewedByHim;
+        })->keys();
     }
 
     private function getOrCreateContributor(string $contributorName)
@@ -234,7 +238,8 @@ class GithubRepositoryContributors
 
         $contributor = (object) [
             'issues' => collect(),
-            'pullRequests' => collect()
+            'pullRequests' => collect(),
+            'commits' => collect(),
         ];
 
         $this->collection->put($contributorName, $contributor);

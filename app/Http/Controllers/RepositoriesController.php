@@ -2,22 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use DateInterval;
 use Carbon\Carbon;
 use App\Repository;
+use Carbon\CarbonInterval;
 use Illuminate\Support\Str;
+
 use Illuminate\Http\Request;
 use App\Helpers\GithubApiClient;
-
 use App\Services\GithubRepositoryService;
+use GuzzleHttp\Exception\ServerException;
 use App\Helpers\GithubRepositoryContributors;
+
 use App\Helpers\GithubRepositoryPullRequests;
 use App\Services\GithubRepositoryIssueService;
 use App\Services\GithubRepositoryBranchService;
-
-use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
 use App\Services\GithubRepositoryPullRequestsService;
-use DateInterval;
-use GuzzleHttp\Exception\ServerException;
+use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
 
 const MAX_ISSUES = 100;
 
@@ -56,20 +57,17 @@ class RepositoriesController extends Controller
 
         $repositoryMetrics = $this->repositoryService->getRepositoryMetrics($request->name, $request->owner);
 
-
-
-
-        // $repositoryBranches = $this->branchesService->getRepositoryBranches($request->name, $request->owner, $repositoryMetrics->branches->totalCount);
-
         $repositoryContributors = new GithubRepositoryContributors();
 
-        // $issuesReport = $this->makeIssuesReport($request->name, $request->owner, $repositoryMetrics->issues->totalCount, $repositoryContributors);
+        $issuesReport = $this->makeIssuesReport($request->name, $request->owner, $repositoryMetrics->issues->totalCount, $repositoryContributors);
         $pullRequestsReport = $this->makePullRequestsReport($request->name, $request->owner, $repositoryMetrics->pullRequests->totalCount, $repositoryContributors);
+        $contributorsReport = $this->makeContributorsReport($request->name, $request->owner, $repositoryMetrics->branches->totalCount, $repositoryContributors);
 
         return response()->json([
             'repo' => $repository,
+            'issues' => $issuesReport,
             'pullRequests' => $pullRequestsReport,
-            'contributors' => $repositoryContributors->get()
+            'contributors' => $contributorsReport
         ]);
     }
 
@@ -152,21 +150,11 @@ class RepositoriesController extends Controller
 
     private function makePullRequestsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
-        // try {
         $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($name, $owner, $totalCount);
-        // } catch (ServerException $e) {
-        //     var_dump("Server exception");
-        //     echo $e->getResponse();
-        //     $repositoryPullRequests = new GithubRepositoryPullRequests();
-        //     return $e->getResponse();
-        // }
 
         $totals = (object) [
             'closeTime' => Carbon::make('@0'), // timestamp 0
             'mergeTime' => Carbon::make('@0'),
-            'prc_good_assignees' => 0,
-            'prc_good_reviewers' => 0,
-            'prc_unexpected_reviewers' => 0,
             'commits' => 0
         ];
 
@@ -197,7 +185,7 @@ class RepositoriesController extends Controller
             $totals->mergeTime->add($pullRequestInfo->timeToMerge);
 
             if ($pullRequestInfo->timeToClose < $oneHour) {
-                $report['closed_les_than_one_hour']++;
+                $report['closed_less_than_one_hour']++;
             }
 
             if ($pullRequest->author !== null) {
@@ -224,18 +212,6 @@ class RepositoriesController extends Controller
                 $repositoryContributors->registerPullRequestAction($reviewer, ACTION_REVIEW, $pullRequestInfo);
             }
 
-            // $totals->prc_good_assignees
-            if (count($pullRequest->suggestedReviewers) > 0) {
-                $good_reviewers = array_intersect($pullRequest->suggestedReviewers, $pullRequest->reviewers);
-                $unexpected_reviewers = array_diff($pullRequest->reviewers, $pullRequest->suggestedReviewers);
-
-                $prc_good_reviewers = count($good_reviewers) / count($pullRequest->suggestedReviewers) * 100;
-                $prc_unexpected_reviewers = count($unexpected_reviewers) / count($pullRequest->suggestedReviewers) * 100;
-
-                $totals->prc_good_reviewers += $prc_good_reviewers;
-                $totals->prc_unexpected_reviewers += $prc_unexpected_reviewers;
-            }
-
             return $report;
         }, [
             'total' => 0,
@@ -248,12 +224,8 @@ class RepositoriesController extends Controller
 
         if ($totalPullRequests > 0) {
 
-            $pullRequestsReport['avg_prc_good_assignees'] = round($totals->prc_good_assignees / $totalPullRequests, 2);
-            $pullRequestsReport['avg_prc_bad_assignees'] = 100 - $pullRequestsReport['avg_prc_good_assignees'];
-            $pullRequestsReport['avg_prc_good_reviewers'] = round($totals->prc_good_reviewers / $totalPullRequests, 2);
-            $pullRequestsReport['avg_prc_unexpected_reviewers'] = round($totals->prc_unexpected_reviewers / $totalPullRequests, 2);
-            $pullRequestsReport['avg_prc_bad_reviewers'] = 100 - $pullRequestsReport['avg_prc_good_reviewers'] - $pullRequestsReport['avg_prc_unexpected_reviewers'];
-            $pullRequestsReport['avg_commits_per_pr'] = round($totals->commits / $totalPullRequests, 2);
+            $pullRequestsReport['prc_closed_with_commits'] = round($pullRequestsReport['closed_without_commits'] / $totalPullRequests, 2);
+            $pullRequestsReport['avg_commits_per_pr'] = round($totals->commits / $totalPullRequests);
 
             $avg_minutes_to_close = round($totals->closeTime->getTimestamp() / 60 / $totalPullRequests);
             $avg_minutes_to_merge = round($totals->mergeTime->getTimestamp() / 60 / $totalPullRequests);
@@ -263,5 +235,151 @@ class RepositoriesController extends Controller
         }
 
         return $pullRequestsReport;
+    }
+
+    private function makeContributorsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
+    {
+        $repositoryBranches = $this->branchesService->getRepositoryBranches($name, $owner, $totalCount);
+
+        $repositoryBranches->get()->each(function ($branch) use ($repositoryContributors) {
+            $branch->commits->each(function ($commit) use ($branch, $repositoryContributors) {
+
+                if ($commit->author !== null && $commit->changedFiles > 0) {
+
+                    $timeToPush = $commit->pushedAt !== null ? Carbon::make('@0')->add(
+                        Carbon::make($commit->committedAt)->diffAsCarbonInterval($commit->pushedAt)
+                    )->timestamp : null;
+
+                    $commitInfo = (object) [
+                        'id' => $commit->id,
+                        'branch' => $branch->name,
+                        'changedLines' => $commit->additions + $commit->deletions,
+                        'changedFiles' => $commit->changedFiles,
+                        'timeToPush' => $timeToPush
+                    ];
+
+                    $repositoryContributors->registerCommitAction($commit->author, ACTION_COMMIT_BRANCH, $commitInfo);
+
+                    foreach ($commit->pullRequests as $pullRequest) {
+                        $commitInfo->pullRequest = $pullRequest;
+
+                        $repositoryContributors->registerCommitAction($commit->author, ACTION_COMMIT_PR, $commitInfo);
+                    }
+                }
+            });
+        });
+
+        $contributors = $repositoryContributors->get()->flatten(1)->reduce(function ($contributors, $contributor) {
+            return (object) [
+                'issues' => $contributors->issues->merge($contributor->issues),
+                'pullRequests' => $contributors->pullRequests->merge($contributor->pullRequests),
+                'commits' => $contributors->commits->merge($contributor->commits)
+            ];
+        }, (object) [
+            'issues' => collect(),
+            'pullRequests' => collect(),
+            'commits' => collect()
+        ]);
+
+        $pullRequests = $contributors->pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            $pullRequest->contributorsCollection = $repositoryContributors->getContributorsCommitedTo($pullRequest->id);
+            $pullRequest->reviewersCollection = $repositoryContributors->getContributorsReviewedTo($pullRequest->id);
+
+            return $pullRequest;
+        });
+
+        $avgTimeToPush = Carbon::createFromTimestamp(
+            floor($contributors->commits->pluck('timeToPush')->filter(function ($timeToPush) {
+                return $timeToPush !== null;
+            })->median())
+        )->diffAsCarbonInterval(
+            Carbon::createFromTimestamp(0)
+        );
+
+        return [
+            'total' => $repositoryContributors->get()->count(),
+            'avg_files_per_commit' => $contributors->commits->pluck('changedFiles')->median(),
+            'avg_lines_per_commit' => $contributors->commits->pluck('changedLines')->median(),
+            'avg_lines_per_file_per_commit' => $contributors->commits->pluck('linesPerFile')->median(),
+            'avg_pull_request_contributed' => $repositoryContributors->get()->map(function ($contributor) {
+                return $contributor->pullRequests->count();
+            })->median(),
+            'avg_prc_good_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+                $contributors = $pullRequest->contributorsCollection;
+                $good_assignees = $contributors->intersect($repositoryContributors->getContributorsAssignedTo($pullRequest->id));
+
+                $totalContributors = $contributors->count();
+
+                if ($totalContributors <= 0) {
+                    return 0;
+                }
+
+                return round($good_assignees->count() / $totalContributors, 2);
+            })->median(),
+            'avg_prc_bad_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+                $contributors = $pullRequest->contributorsCollection;
+                $bad_assignees = $repositoryContributors->getContributorsAssignedTo($pullRequest->id)->diff($contributors);
+
+                $totalContributors = $contributors->count();
+
+                if ($totalContributors <= 0) {
+                    return $bad_assignees->count() > 0 ? 100 : 0;
+                }
+
+                return round($bad_assignees->count() / $totalContributors, 2);
+            })->median(),
+            'avg_prc_unexpected_contributors' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+                $contributors = $pullRequest->contributorsCollection;
+                $unexpected_contributors = $contributors->diff($repositoryContributors->getContributorsAssignedTo($pullRequest->id));
+
+                $totalContributors = $contributors->count();
+
+                if ($totalContributors <= 0) {
+                    return 0;
+                }
+
+                return round($unexpected_contributors->count() / $totalContributors, 2);
+            })->median(),
+            'avg_prc_good_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+                $reviewers = $pullRequest->reviewersCollection;
+                $good_reviewers = $reviewers->intersect($repositoryContributors->getContributorsSuggestedForReviewTo($pullRequest->id));
+
+                $totalReviewers = $reviewers->count();
+
+                if ($totalReviewers <= 0) {
+                    return 0;
+                }
+
+                return round($good_reviewers->count() / $totalReviewers, 2);
+            })->median(),
+            'avg_prc_bad_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+                $reviewers = $pullRequest->reviewersCollection;
+                $bad_reviewers = $repositoryContributors->getContributorsSuggestedForReviewTo($pullRequest->id)->diff($reviewers);
+
+                $totalReviewers = $reviewers->count();
+
+                if ($totalReviewers <= 0) {
+                    return $bad_reviewers->count() > 0 ? 100 : 0;
+                }
+
+                return round($bad_reviewers->count() / $totalReviewers, 2);
+            })->median(),
+            'avg_prc_unexpected_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+                $reviewers = $pullRequest->reviewersCollection;
+                $unexpected_reviewers = $reviewers->diff($repositoryContributors->getContributorsSuggestedForReviewTo($pullRequest->id));
+
+                $totalReviewers = $reviewers->count();
+
+                if ($totalReviewers <= 0) {
+                    return 0;
+                }
+
+                return round($unexpected_reviewers->count() / $totalReviewers, 2);
+            })->median(),
+            'avg_time_to_push' => $avgTimeToPush->forHumans(),
+            'prc_new_code' => 0,
+            'prc_rewrite_others_code' => 0,
+            'prc_rewrite_own_code' => 0
+        ];
     }
 }

@@ -454,10 +454,16 @@ class GithubApiClient
                                     additions,
                                     deletions,
                                     committedDate,
+                                    pushedDate,
                                     author {
                                         name
                                         user {
                                             login
+                                        }
+                                    },
+                                    associatedPullRequests(first: 5) {
+                                        nodes {
+                                            id
                                         }
                                     }
                                 }
@@ -499,10 +505,16 @@ class GithubApiClient
                                     additions,
                                     deletions,
                                     committedDate,
+                                    pushedDate,
                                     author {
                                         name
                                         user {
                                             login
+                                        }
+                                    },
+                                    associatedPullRequests(first: 5) {
+                                        nodes {
+                                            id
                                         }
                                     }
                                 }
