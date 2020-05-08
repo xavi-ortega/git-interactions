@@ -15,6 +15,7 @@ use GuzzleHttp\Exception\ServerException;
 use App\Helpers\GithubRepositoryContributors;
 
 use App\Helpers\GithubRepositoryPullRequests;
+use App\Report;
 use App\Services\GithubRepositoryIssueService;
 use App\Services\GithubRepositoryBranchService;
 use App\Services\GithubRepositoryPullRequestsService;
@@ -94,27 +95,28 @@ class RepositoriesController extends Controller
     {
         $repositoryIssues = $this->issueService->getRepositoryIssues($name, $owner, $totalCount);
 
-        $totalTimeDiff = Carbon::make('@0'); // timestamp 0
         $oneHour = new DateInterval('PT1H');
 
-        $issuesReport = $repositoryIssues->get()->reduce(function ($report, $issue) use ($repositoryContributors, $totalTimeDiff, $oneHour) {
-            $report['total']++;
+        $total = $repositoryIssues->get()->reduce(function ($total, $issue) use ($repositoryContributors, $oneHour) {
+            $total->issues++;
 
             if ($issue->closed) {
-                $report['closed']++;
+                $total->closed++;
             } else {
-                $report['open']++;
+                $total->open++;
             }
+
+            $intervalToClose = Carbon::make($issue->createdAt)->diff($issue->closedAt);
 
             $issueInfo = (object) [
                 'id' => $issue->id,
-                'timeToClose' => Carbon::make($issue->createdAt)->diff($issue->closedAt)
+                'timeToClose' => Carbon::make('@0')->add($intervalToClose)->timestamp
             ];
 
-            $totalTimeDiff->add($issueInfo->timeToClose);
+            $total->closeTime->push($issueInfo->timeToClose);
 
-            if ($issueInfo->timeToClose < $oneHour) {
-                $report['closed_les_than_one_hour']++;
+            if ($intervalToClose < $oneHour) {
+                $total->closedInLessThanOneHour;
             }
 
             if ($issue->author !== null) {
@@ -127,65 +129,76 @@ class RepositoriesController extends Controller
                 if (Str::contains($issue->closedBy, [
                     'bot', 'b0t'
                 ])) {
-                    $report['closed_by_bot']++;
+                    $total->closedByBot++;
                 }
             }
 
-            return $report;
-        }, [
-            'total' => 0,
+            return $total;
+        }, (object) [
+            'issues' => 0,
             'open' => 0,
             'closed' => 0,
-            'closed_by_bot' => 0,
-            'closed_less_than_one_hour' => 0
+            'closedByBot' => 0,
+            'closedInLessThanOneHour' => 0,
+            'closeTime' => collect()
         ]);
 
-        $avg_seconds_to_close = round($totalTimeDiff->getTimestamp() / $repositoryIssues->get()->count());
-        $avg_minutes_to_close = round($avg_seconds_to_close / 60);
+        $avgTimeToClose = Carbon::createFromTimestamp(
+            floor($total->closeTime->median())
+        )->diffAsCarbonInterval(
+            Carbon::createFromTimestamp(0)
+        );
 
-        $issuesReport['avg_time_to_close'] = floor($avg_minutes_to_close /  60) . ':' . $avg_minutes_to_close % 60;
 
-        return $issuesReport;
+        return [
+            'total' => $total->issues,
+            'open' => $total->open,
+            'closed' => $total->closed,
+            'closed_by_bot' => $total->closedByBot,
+            'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
+            'avg_time_to_close' => $avgTimeToClose->forHumans()
+        ];
     }
 
     private function makePullRequestsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
         $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($name, $owner, $totalCount);
 
-        $totals = (object) [
-            'closeTime' => Carbon::make('@0'), // timestamp 0
-            'mergeTime' => Carbon::make('@0'),
-            'commits' => 0
-        ];
-
         $oneHour = new DateInterval('PT1H');
 
-        $pullRequestsReport = $repositoryPullRequests->get()->reduce(function ($report, $pullRequest) use ($repositoryContributors, $totals, $oneHour) {
-            $report['total']++;
+        $total = $repositoryPullRequests->get()->reduce(function ($total, $pullRequest) use ($repositoryContributors, $oneHour) {
+            $total->pullRequests++;
 
             if ($pullRequest->closed) {
-                $report['closed']++;
+                $total->closed++;
 
                 if ($pullRequest->totalCommits <= 0) {
-                    $report['closed_without_commits']++;
+                    $total->closedWithoutCommits++;
                 } else {
-                    $totals->commits += $pullRequest->totalCommits;
+                    $total->commits += $pullRequest->totalCommits;
                 }
             } else {
-                $report['open']++;
+                $total->open++;
             }
+
+            $intervalToClose = Carbon::make($pullRequest->createdAt)->diff($pullRequest->closedAt);
+            $intervalToMerge = Carbon::make($pullRequest->createdAt)->diff($pullRequest->mergedAt);
 
             $pullRequestInfo = (object) [
                 'id' => $pullRequest->id,
-                'timeToClose' => Carbon::make($pullRequest->createdAt)->diff($pullRequest->closedAt),
-                'timeToMerge' => Carbon::make($pullRequest->createdAt)->diff($pullRequest->mergedAt)
+                'timeToClose' => Carbon::make('@0')->add($intervalToClose)->timestamp,
+                'timeToMerge' => Carbon::make('@0')->add($intervalToMerge)->timestamp,
             ];
 
-            $totals->closeTime->add($pullRequestInfo->timeToClose);
-            $totals->mergeTime->add($pullRequestInfo->timeToMerge);
+            $total->closeTime->push($pullRequestInfo->timeToClose);
+            $total->mergeTime->push($pullRequestInfo->timeToMerge);
 
-            if ($pullRequestInfo->timeToClose < $oneHour) {
-                $report['closed_less_than_one_hour']++;
+            if ($intervalToClose < $oneHour) {
+                $total->closedInLessThanOneHour++;
+            }
+
+            if ($intervalToMerge < $oneHour) {
+                $total->mergedInLessThanOneHour++;
             }
 
             if ($pullRequest->author !== null) {
@@ -212,29 +225,43 @@ class RepositoriesController extends Controller
                 $repositoryContributors->registerPullRequestAction($reviewer, ACTION_REVIEW, $pullRequestInfo);
             }
 
-            return $report;
-        }, [
-            'total' => 0,
+            return $total;
+        }, (object) [
+            'pullRequests' => 0,
             'open' => 0,
             'closed' => 0,
-            'closed_without_commits' => 0,
+            'closedWithoutCommits' => 0,
+            'closedInLessThanOneHour' => 0,
+            'mergedInLessThanOneHour' => 0,
+            'closeTime' => collect(),
+            'mergeTime' => collect(),
+            'commits' => 0
         ]);
 
-        $totalPullRequests = $repositoryPullRequests->get()->count();
+        $avgTimeToClose = Carbon::createFromTimestamp(
+            floor($total->closeTime->median())
+        )->diffAsCarbonInterval(
+            Carbon::createFromTimestamp(0)
+        );
 
-        if ($totalPullRequests > 0) {
+        $avgTimeToMerge = Carbon::createFromTimestamp(
+            floor($total->mergeTime->median())
+        )->diffAsCarbonInterval(
+            Carbon::createFromTimestamp(0)
+        );
 
-            $pullRequestsReport['prc_closed_with_commits'] = round($pullRequestsReport['closed_without_commits'] / $totalPullRequests, 2);
-            $pullRequestsReport['avg_commits_per_pr'] = round($totals->commits / $totalPullRequests);
-
-            $avg_minutes_to_close = round($totals->closeTime->getTimestamp() / 60 / $totalPullRequests);
-            $avg_minutes_to_merge = round($totals->mergeTime->getTimestamp() / 60 / $totalPullRequests);
-
-            $pullRequestsReport['avg_time_to_close'] = floor($avg_minutes_to_close / 60) . ':' . ($avg_minutes_to_close % 60);
-            $pullRequestsReport['avg_time_to_merge'] = floor($avg_minutes_to_merge / 60) . ':' . ($avg_minutes_to_merge % 60);
-        }
-
-        return $pullRequestsReport;
+        return [
+            'total' => $total->pullRequests,
+            'open' => $total->open,
+            'closed' => $total->closed,
+            'closed_without_commits' => $total->closedWithoutCommits,
+            'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
+            'merged_less_than_one_hour' => $total->mergedInLessThanOneHour,
+            'prc_closed_with_commits' => 100 - round($total->closedWithoutCommits / $total->pullRequests, 2),
+            'avg_commits_per_pr' => $repositoryPullRequests->get()->pluck('totalCommits')->median(),
+            'avg_time_to_close' => $avgTimeToClose->forHumans(),
+            'avg_time_to_merge' => $avgTimeToMerge->forHumans()
+        ];
     }
 
     private function makeContributorsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
@@ -247,7 +274,7 @@ class RepositoriesController extends Controller
                 if ($commit->author !== null && $commit->changedFiles > 0) {
 
                     $timeToPush = $commit->pushedAt !== null ? Carbon::make('@0')->add(
-                        Carbon::make($commit->committedAt)->diffAsCarbonInterval($commit->pushedAt)
+                        Carbon::make($commit->committedAt)->diff($commit->pushedAt)
                     )->timestamp : null;
 
                     $commitInfo = (object) [
@@ -298,9 +325,9 @@ class RepositoriesController extends Controller
 
         return [
             'total' => $repositoryContributors->get()->count(),
-            'avg_files_per_commit' => $contributors->commits->pluck('changedFiles')->median(),
-            'avg_lines_per_commit' => $contributors->commits->pluck('changedLines')->median(),
-            'avg_lines_per_file_per_commit' => $contributors->commits->pluck('linesPerFile')->median(),
+            'avg_files_per_commit' => floor($contributors->commits->pluck('changedFiles')->median()),
+            'avg_lines_per_commit' => floor($contributors->commits->pluck('changedLines')->median()),
+            'avg_lines_per_file_per_commit' => floor($contributors->commits->pluck('linesPerFile')->median()),
             'avg_pull_request_contributed' => $repositoryContributors->get()->map(function ($contributor) {
                 return $contributor->pullRequests->count();
             })->median(),

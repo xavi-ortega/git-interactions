@@ -21,15 +21,11 @@ class CreatePullRequestReportsTable extends Migration
             $table->bigInteger('open');
             $table->bigInteger('closed');
             $table->bigInteger('closed_without_commits');
-            $table->decimal('prc_good_asignees');
-            $table->decimal('prc_bad_asignees');
-            $table->decimal('prc_good_reviewers');
-            $table->decimal('prc_bad_reviewers');
-            $table->decimal('prc_unexpected_reviewers');
-            $table->decimal('prc_good_reactions');
+            $table->bigInteger('closed_less_than_one_hour');
             $table->decimal('prc_closed_with_commits');
-            $table->decimal('prc_commits_by_assignees');
             $table->bigInteger('avg_commits_per_pr');
+            $table->string('avg_time_to_close');
+            $table->string('avg_time_to_merge');
 
             $table->timestamps();
         });
