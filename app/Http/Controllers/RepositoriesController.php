@@ -19,7 +19,10 @@ use App\Report;
 use App\Services\GithubRepositoryIssueService;
 use App\Services\GithubRepositoryBranchService;
 use App\Services\GithubRepositoryPullRequestsService;
+use App\User;
+
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
+use Illuminate\Support\Facades\Log;
 
 const MAX_ISSUES = 100;
 
@@ -56,19 +59,13 @@ class RepositoriesController extends Controller
 
         $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        $repositoryMetrics = $this->repositoryService->getRepositoryMetrics($request->name, $request->owner);
-
-        $repositoryContributors = new GithubRepositoryContributors();
-
-        $issuesReport = $this->makeIssuesReport($request->name, $request->owner, $repositoryMetrics->issues->totalCount, $repositoryContributors);
-        $pullRequestsReport = $this->makePullRequestsReport($request->name, $request->owner, $repositoryMetrics->pullRequests->totalCount, $repositoryContributors);
-        $contributorsReport = $this->makeContributorsReport($request->name, $request->owner, $repositoryMetrics->branches->totalCount, $repositoryContributors);
+        $report = $this->getOrCreateReport($repository);
 
         return response()->json([
             'repo' => $repository,
-            'issues' => $issuesReport,
-            'pullRequests' => $pullRequestsReport,
-            'contributors' => $contributorsReport
+            'issues' => $report->issues,
+            'pullRequests' => $report->pull_requests,
+            'contributors' => $report->contributors
         ]);
     }
 
@@ -89,6 +86,33 @@ class RepositoriesController extends Controller
         }
 
         return $repository;
+    }
+
+    private function getOrCreateReport(Repository $repository): Report
+    {
+        $user = User::find(1);
+
+        $report = $repository->reports()->first();
+
+        if ($report === null) {
+            $repositoryContributors = new GithubRepositoryContributors();
+            $repositoryMetrics = $this->repositoryService->getRepositoryMetrics($repository->name, $repository->owner);
+
+            $issuesReport = $this->makeIssuesReport($repository->name, $repository->owner, $repositoryMetrics->issues->totalCount, $repositoryContributors);
+            $pullRequestsReport = $this->makePullRequestsReport($repository->name, $repository->owner, $repositoryMetrics->pullRequests->totalCount, $repositoryContributors);
+            $contributorsReport = $this->makeContributorsReport($repository->name, $repository->owner, $repositoryMetrics->branches->totalCount, $repositoryContributors);
+
+            $report = $user->reports()->create([
+                'repository_id' => $repository->id,
+                'raw' => $repositoryContributors->get()->toJson()
+            ]);
+
+            $report->issues()->create($issuesReport);
+            $report->pull_requests()->create($pullRequestsReport);
+            $report->contributors()->create($contributorsReport);
+        }
+
+        return $report;
     }
 
     private function makeIssuesReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
@@ -162,7 +186,9 @@ class RepositoriesController extends Controller
 
     private function makePullRequestsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
+
         $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($name, $owner, $totalCount);
+
 
         $oneHour = new DateInterval('PT1H');
 

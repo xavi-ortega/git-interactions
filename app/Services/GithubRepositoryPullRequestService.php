@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Helpers\GithubApiClient;
+use Illuminate\Support\Facades\Log;
 use App\Helpers\GithubRepositoryPullRequests;
 
 const MAX_PULL_REQUESTS = 90;
@@ -63,6 +64,8 @@ class GithubRepositoryPullRequestsService
             );
 
             $after = $paginatedPullRequests->pageInfo->endCursor;
+
+            Log::debug($i . ' of ' . $pages . ' of pullRequests');
         }
 
         $repositoryPullRequests->add(
@@ -73,6 +76,8 @@ class GithubRepositoryPullRequestsService
                 'after' => $after
             ])->nodes
         );
+
+        Log::debug($i . ' of ' . $pages . ' of pullRequests');
 
 
         return $repositoryPullRequests;

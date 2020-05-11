@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Helpers\GithubApiClient;
+use Illuminate\Support\Facades\Log;
 use App\Helpers\GithubRepositoryBranches;
 
 const MAX_BRANCHES = 100;
@@ -71,6 +72,8 @@ class GithubRepositoryBranchService
             );
 
             $after = $paginatedBranches->pageInfo->endCursor;
+
+            Log::debug($i . ' of ' . $pages . ' of branches');
         }
 
         $repositoryBranches->add(
@@ -81,6 +84,8 @@ class GithubRepositoryBranchService
                 'after' => $after
             ])->nodes
         );
+
+        Log::debug($i . ' of ' . $pages . ' of branches');
 
         $branchNames = $repositoryBranches->get()->pluck('totalCommits', 'name');
 
@@ -136,6 +141,8 @@ class GithubRepositoryBranchService
             $commits = $commits->merge($paginatedCommits->nodes);
 
             $after = $paginatedCommits->pageInfo->endCursor;
+
+            Log::debug($i . ' of ' . $pages . ' of commits of branch ' . $branch);
         }
 
         $paginatedCommits = $this->github->getRepositoryCommitsByBranchPaginated([
@@ -145,6 +152,8 @@ class GithubRepositoryBranchService
             'branch' => 'refs/heads/' . $branch,
             'after' => $after,
         ]);
+
+        Log::debug($i . ' of ' . $pages . ' of commits of branch ' . $branch);
 
         $commits = $commits->merge($paginatedCommits->nodes);
 

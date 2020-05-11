@@ -18,6 +18,7 @@ class CreateReportsTable extends Migration
 
             $table->unsignedBigInteger('repository_id');
             $table->unsignedBigInteger('user_id');
+            $table->json('raw');
             $table->softDeletes();
 
             $table->timestamps();

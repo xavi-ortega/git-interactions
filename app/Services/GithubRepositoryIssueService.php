@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Helpers\GithubApiClient;
+use Illuminate\Support\Facades\Log;
 use App\Helpers\GithubRepositoryIssues;
 
 const MAX_ISSUES = 100;
@@ -62,6 +63,8 @@ class GithubRepositoryIssueService
             );
 
             $after = $paginatedIssues->pageInfo->endCursor;
+
+            Log::debug($i . ' of ' . $pages . ' of issues');
         }
 
         $repositoryIssues->add(
@@ -72,6 +75,8 @@ class GithubRepositoryIssueService
                 'after' => $after
             ])->nodes
         );
+
+        Log::debug($i . ' of ' . $pages . ' of issues');
 
 
         return $repositoryIssues;

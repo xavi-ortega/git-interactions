@@ -22,6 +22,7 @@
         "closed": 62,
         "closed_without_commits": 1,
         "closed_less_than_one_hour": 1,
+        "merged_less_than_one_hour": 1,
         "prc_closed_with_commits": 97.8,
         "avg_commits_per_pr": 4,
         "avg_time_to_close": "40:16",

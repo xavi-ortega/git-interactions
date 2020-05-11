@@ -22,6 +22,7 @@ class CreatePullRequestReportsTable extends Migration
             $table->bigInteger('closed');
             $table->bigInteger('closed_without_commits');
             $table->bigInteger('closed_less_than_one_hour');
+            $table->bigInteger('merged_less_than_one_hour');
             $table->decimal('prc_closed_with_commits');
             $table->bigInteger('avg_commits_per_pr');
             $table->string('avg_time_to_close');

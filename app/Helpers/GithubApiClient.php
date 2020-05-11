@@ -4,6 +4,7 @@ namespace App\Helpers;
 
 use GraphQL\{Client, Query, Variable};
 use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Support\Facades\Log;
 
 /**
  * GithubApiClient
@@ -32,7 +33,8 @@ class GithubApiClient
         $this->client = new Client(
             'https://api.github.com/graphql',
             [
-                'Authorization' => 'Bearer ' . env('GITHUB_ACCESS_TOKEN')
+                'Authorization' => 'Bearer ' . env('GITHUB_ACCESS_TOKEN'),
+                'Accept' => ['application/vnd.github.merge-info-preview+json', 'application/vnd.github.starfox-preview+json'],
             ]
 
         );
@@ -538,7 +540,13 @@ class GithubApiClient
      */
     private function run($query, $params = [])
     {
-        return $this->client->runQuery($query, false, $params);
+        try {
+            return $this->client->runQuery($query, false, $params);
+        } catch (\Exception $e) {
+            Log::error('error graphql');
+            Log::error($query);
+            Log::error($params);
+        }
     }
 
     /**
@@ -549,6 +557,12 @@ class GithubApiClient
      */
     private function runRaw($query, $params = [])
     {
-        return $this->client->runRawQuery($query, false, $params);
+        try {
+            return $this->client->runRawQuery($query, false, $params);
+        } catch (\Exception $e) {
+            Log::error('error graphql');
+            Log::error($query);
+            Log::error($params);
+        }
     }
 }
