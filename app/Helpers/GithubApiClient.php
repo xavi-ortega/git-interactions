@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use App\Exceptions\RepositoryNotFoundException;
 use GraphQL\{Client, Query, Variable};
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
@@ -97,8 +98,13 @@ class GithubApiClient
                     'url'
                 ]
             );
+        $repositoryInfo = $this->run($query, $params);
 
-        return $this->run($query, $params)->getData()->repository;
+        if ($repositoryInfo === null) {
+            throw new RepositoryNotFoundException();
+        }
+
+        return $repositoryInfo->getData()->repository;
     }
 
     /**
@@ -560,9 +566,23 @@ class GithubApiClient
         try {
             return $this->client->runRawQuery($query, false, $params);
         } catch (\Exception $e) {
-            Log::error('error graphql');
-            Log::error($query);
-            Log::error($params);
+            Log::error('error graphql retry 1');
+            sleep(1);
+
+            try {
+                return $this->client->runRawQuery($query, false, $params);
+            } catch (\Exception $e) {
+                Log::error('error graphql retry 2');
+                sleep(1);
+
+                try {
+                    return $this->client->runRawQuery($query, false, $params);
+                } catch (\Exception $e) {
+                    Log::error('error graphql');
+                    Log::error($query);
+                    Log::error($params);
+                }
+            }
         }
     }
 }

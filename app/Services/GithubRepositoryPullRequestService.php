@@ -20,11 +20,11 @@ class GithubRepositoryPullRequestsService
 
     public function getRepositoryPullRequests(string $name, string $owner, int $total): GithubRepositoryPullRequests
     {
-        if ($total > MAX_PULL_REQUESTS) {
-            $repositoryPullRequests = $this->getRepositoryPullRequestsOverMax($name, $owner, $total);
-        } else {
-            $repositoryPullRequests = $this->getRepositoryPullRequestsUnderMax($name, $owner, $total);
-        }
+        // if ($total > MAX_PULL_REQUESTS) {
+        $repositoryPullRequests = $this->getRepositoryPullRequestsOverMax($name, $owner, $total);
+        // } else {
+        //     $repositoryPullRequests = $this->getRepositoryPullRequestsUnderMax($name, $owner, $total);
+        // }
 
         return $repositoryPullRequests;
     }
@@ -46,7 +46,7 @@ class GithubRepositoryPullRequestsService
     {
         $repositoryPullRequests = new GithubRepositoryPullRequests();
 
-        $pages = $total / MAX_PULL_REQUESTS + 1;
+        $pages = floor($total / MAX_PULL_REQUESTS + 1);
         $lastPageCount = $total % MAX_PULL_REQUESTS;
 
         $after = null;
@@ -65,20 +65,23 @@ class GithubRepositoryPullRequestsService
 
             $after = $paginatedPullRequests->pageInfo->endCursor;
 
-            Log::debug($i . ' of ' . $pages . ' of pullRequests');
+            Log::debug($i . ' of ' . $pages . ' pages of pullRequests');
         }
 
+        $paginatedPullRequests = $this->github->getRepositoryPullRequestsPaginated([
+            'name' => $name,
+            'owner' => $owner,
+            'first' => $lastPageCount,
+            'after' => $after
+        ]);
+
         $repositoryPullRequests->add(
-            $this->github->getRepositoryPullRequestsPaginated([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => $lastPageCount,
-                'after' => $after
-            ])->nodes
+            $paginatedPullRequests->nodes
         );
 
-        Log::debug($i . ' of ' . $pages . ' of pullRequests');
+        $repositoryPullRequests->setEndCursor($paginatedPullRequests->pageInfo->endCursor);
 
+        Log::debug($i . ' of ' . $pages . ' pages of pullRequests');
 
         return $repositoryPullRequests;
     }

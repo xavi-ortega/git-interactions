@@ -21,6 +21,7 @@ class CreateRepositoriesTable extends Migration
             $table->string('url');
             $table->string('owner');
             $table->string('description');
+            $table->string('raw')->nullable();
 
             $table->timestamps();
         });

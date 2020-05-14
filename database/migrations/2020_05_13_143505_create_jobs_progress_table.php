@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateReportsTable extends Migration
+class CreateJobsProgressTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,14 +13,9 @@ class CreateReportsTable extends Migration
      */
     public function up()
     {
-        Schema::create('reports', function (Blueprint $table) {
-            $table->id();
-
-            $table->unsignedBigInteger('repository_id');
-            $table->unsignedBigInteger('user_id');
-            $table->softDeletes();
-
-            $table->timestamps();
+        Schema::create('jobs_progress', function (Blueprint $table) {
+            $table->foreignId('job_id')->constrained()->onDelete('cascade');
+            $table->tinyInteger('progress')->default(0);
         });
     }
 
@@ -31,6 +26,6 @@ class CreateReportsTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('reports');
+        Schema::dropIfExists('jobs_progress');
     }
 }

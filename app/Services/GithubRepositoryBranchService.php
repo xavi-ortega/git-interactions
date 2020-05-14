@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Helpers\GithubApiClient;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\GithubRepositoryBranches;
 
@@ -20,11 +21,11 @@ class GithubRepositoryBranchService
 
     public function getRepositoryBranches(string $name, string $owner, int $total): GithubRepositoryBranches
     {
-        if ($total > MAX_BRANCHES) {
-            $repositoryBranches = $this->getRepositoryBranchesOverMax($name, $owner, $total);
-        } else {
-            $repositoryBranches = $this->getRepositoryBranchesUnderMax($name, $owner, $total);
-        }
+        // if ($total > MAX_BRANCHES) {
+        $repositoryBranches = $this->getRepositoryBranchesOverMax($name, $owner, $total);
+        // } else {
+        //     $repositoryBranches = $this->getRepositoryBranchesUnderMax($name, $owner, $total);
+        // }
 
         return $repositoryBranches;
     }
@@ -44,7 +45,7 @@ class GithubRepositoryBranchService
         foreach ($branchNames as $branchName => $totalCommits) {
             $commits = $this->getBranchCommits($name, $owner, $totalCommits, $branchName);
 
-            $repositoryBranches->addCommits($branchName, $commits);
+            $repositoryBranches->addCommits($branchName, $commits->toArray());
         }
 
         return $repositoryBranches;
@@ -54,7 +55,7 @@ class GithubRepositoryBranchService
     {
         $repositoryBranches = new GithubRepositoryBranches();
 
-        $pages = $total / MAX_BRANCHES + 1;
+        $pages = floor($total / MAX_BRANCHES + 1);
         $lastPageCount = $total % MAX_BRANCHES;
 
         $after = null;
@@ -73,42 +74,50 @@ class GithubRepositoryBranchService
 
             $after = $paginatedBranches->pageInfo->endCursor;
 
-            Log::debug($i . ' of ' . $pages . ' of branches');
+            Log::debug($i . ' of ' . $pages . ' pages of branches');
         }
 
+        $paginatedBranches = $this->github->getRepositoryBranchesPaginated([
+            'name' => $name,
+            'owner' => $owner,
+            'first' => $lastPageCount,
+            'after' => $after
+        ]);
+
         $repositoryBranches->add(
-            $this->github->getRepositoryBranchesPaginated([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => $lastPageCount,
-                'after' => $after
-            ])->nodes
+            $paginatedBranches->nodes
         );
 
-        Log::debug($i . ' of ' . $pages . ' of branches');
+        $repositoryBranches->setEndCursor($paginatedBranches->pageInfo->endCursor);
+
+        Log::debug($i . ' of ' . $pages . ' pages of branches');
 
         $branchNames = $repositoryBranches->get()->pluck('totalCommits', 'name');
 
         foreach ($branchNames as $branchName => $totalCommits) {
             $commits = $this->getBranchCommits($name, $owner, $totalCommits, $branchName);
 
-            $repositoryBranches->addCommits($branchName, $commits);
-        }
+            $commitEndCursor = $commits->pull('endCursor');
 
-        return $repositoryBranches;
+            if ($commitEndCursor) {
+                $repositoryBranches->setCommitEndCursor($branchName, $commitEndCursor);
+            }
+
+            $repositoryBranches->addCommits($branchName, $commits->toArray());
+        }
 
         return $repositoryBranches;
     }
 
     private function getBranchCommits(string $name, string $owner, int $total, string $branch)
     {
-        if ($total > MAX_COMMITS) {
-            $commits = $this->getBranchCommitsOverMax($name, $owner, $total, $branch);
-        } else {
-            $commits = $this->getBranchCommitsUnderMax($name, $owner, $total, $branch);
-        }
+        // if ($total > MAX_COMMITS) {
+        $commits = $this->getBranchCommitsOverMax($name, $owner, $total, $branch);
+        // } else {
+        //     $commits = $this->getBranchCommitsUnderMax($name, $owner, $total, $branch);
+        // }
 
-        return $commits ?? [];
+        return $commits ?? collect();
     }
 
     private function getBranchCommitsUnderMax(string $name, string $owner, int $total, string $branch)
@@ -121,10 +130,10 @@ class GithubRepositoryBranchService
         ]);
     }
 
-    private function getBranchCommitsOverMax(string $name, string $owner, int $total, string $branch)
+    private function getBranchCommitsOverMax(string $name, string $owner, int $total, string $branch): Collection
     {
         $commits = collect([]);
-        $pages = $total / MAX_COMMITS + 1;
+        $pages = floor($total / MAX_COMMITS + 1);
         $lastPageCount = $total % MAX_COMMITS;
 
         $after = null;
@@ -142,7 +151,7 @@ class GithubRepositoryBranchService
 
             $after = $paginatedCommits->pageInfo->endCursor;
 
-            Log::debug($i . ' of ' . $pages . ' of commits of branch ' . $branch);
+            Log::debug($i . ' of ' . $pages . ' pages of commits of branch ' . $branch);
         }
 
         $paginatedCommits = $this->github->getRepositoryCommitsByBranchPaginated([
@@ -153,10 +162,12 @@ class GithubRepositoryBranchService
             'after' => $after,
         ]);
 
-        Log::debug($i . ' of ' . $pages . ' of commits of branch ' . $branch);
+        Log::debug($i . ' of ' . $pages . ' pages of commits of branch ' . $branch);
 
         $commits = $commits->merge($paginatedCommits->nodes);
 
-        return $commits->toArray();
+        $commits->put('endCursor', $paginatedCommits->pageInfo->endCursor);
+
+        return $commits;
     }
 }

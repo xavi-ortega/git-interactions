@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 class GithubRepositoryPullRequests
 {
     private $collection;
+    private $endCursor;
 
     public function __construct(array $pullRequests = [])
     {
@@ -22,9 +23,19 @@ class GithubRepositoryPullRequests
         );
     }
 
+    public function setEndCursor(string $endCursor)
+    {
+        $this->endCursor = $endCursor;
+    }
+
     public function get(): Collection
     {
         return $this->collection;
+    }
+
+    public function getEndCursor(): string
+    {
+        return $this->endCursor;
     }
 
     private function formatPullRequests(array $rawPullRequests)

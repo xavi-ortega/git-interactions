@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\RepositoryNotFoundException;
 use DateInterval;
 use Carbon\Carbon;
 use App\Repository;
@@ -23,6 +24,7 @@ use App\User;
 
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 const MAX_ISSUES = 100;
 
@@ -57,16 +59,20 @@ class RepositoriesController extends Controller
             'owner' => 'required'
         ]);
 
-        $repository = $this->getOrCreateRepository($request->name, $request->owner);
+        try {
+            $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        $report = $this->getOrCreateReport($repository);
+            $report = $this->getOrCreateReport($repository);
 
-        return response()->json([
-            'repo' => $repository,
-            'issues' => $report->issues,
-            'pullRequests' => $report->pull_requests,
-            'contributors' => $report->contributors
-        ]);
+            return response()->json([
+                'repo' => $repository,
+                'issues' => $report->issues,
+                'pullRequests' => $report->pull_requests,
+                'contributors' => $report->contributors
+            ]);
+        } catch (RepositoryNotFoundException $e) {
+            return response()->json(['error' => 'Repository not found'], 404);
+        }
     }
 
     private function getOrCreateRepository(string $name, string $owner): Repository
@@ -102,9 +108,15 @@ class RepositoriesController extends Controller
             $pullRequestsReport = $this->makePullRequestsReport($repository->name, $repository->owner, $repositoryMetrics->pullRequests->totalCount, $repositoryContributors);
             $contributorsReport = $this->makeContributorsReport($repository->name, $repository->owner, $repositoryMetrics->branches->totalCount, $repositoryContributors);
 
+            $raw = $repositoryContributors->get()->toJson();
+
+            $path = Storage::disk('raw')->put($repository->id . '/raw.json', $raw);
+
+            $repository->raw = $path;
+            $repository->save();
+
             $report = $user->reports()->create([
                 'repository_id' => $repository->id,
-                'raw' => $repositoryContributors->get()->toJson()
             ]);
 
             $report->issues()->create($issuesReport);
@@ -118,6 +130,8 @@ class RepositoriesController extends Controller
     private function makeIssuesReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
         $repositoryIssues = $this->issueService->getRepositoryIssues($name, $owner, $totalCount);
+
+        $repositoryContributors->registerEndCursor('issues', $repositoryIssues->getEndCursor());
 
         $oneHour = new DateInterval('PT1H');
 
@@ -189,6 +203,7 @@ class RepositoriesController extends Controller
 
         $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($name, $owner, $totalCount);
 
+        $repositoryContributors->registerEndCursor('pullRequests', $repositoryPullRequests->getEndCursor());
 
         $oneHour = new DateInterval('PT1H');
 
@@ -293,6 +308,9 @@ class RepositoriesController extends Controller
     private function makeContributorsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
         $repositoryBranches = $this->branchesService->getRepositoryBranches($name, $owner, $totalCount);
+
+        $repositoryContributors->registerEndCursor('branches', $repositoryBranches->getEndCursor());
+        $repositoryContributors->registerCommitEndCursors($repositoryBranches->getCommitEndCursors());
 
         $repositoryBranches->get()->each(function ($branch) use ($repositoryContributors) {
             $branch->commits->each(function ($commit) use ($branch, $repositoryContributors) {

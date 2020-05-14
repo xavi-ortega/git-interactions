@@ -19,11 +19,11 @@ class GithubRepositoryIssueService
 
     public function getRepositoryIssues(string $name, string $owner, int $total): GithubRepositoryIssues
     {
-        if ($total > MAX_ISSUES) {
-            $repositoryIssues = $this->getRepositoryIssuesOverMax($name, $owner, $total);
-        } else {
-            $repositoryIssues = $this->getRepositoryIssuesUnderMax($name, $owner, $total);
-        }
+        // if ($total > MAX_ISSUES) {
+        $repositoryIssues = $this->getRepositoryIssuesOverMax($name, $owner, $total);
+        // } else {
+        //     $repositoryIssues = $this->getRepositoryIssuesUnderMax($name, $owner, $total);
+        // }
 
         return $repositoryIssues;
     }
@@ -45,7 +45,7 @@ class GithubRepositoryIssueService
     {
         $repositoryIssues = new GithubRepositoryIssues();
 
-        $pages = $total / MAX_ISSUES + 1;
+        $pages = floor($total / MAX_ISSUES + 1);
         $lastPageCount = $total % MAX_ISSUES;
 
         $after = null;
@@ -64,19 +64,23 @@ class GithubRepositoryIssueService
 
             $after = $paginatedIssues->pageInfo->endCursor;
 
-            Log::debug($i . ' of ' . $pages . ' of issues');
+            Log::debug($i . ' of ' . $pages . ' pages of issues');
         }
 
+        $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
+            'name' => $name,
+            'owner' => $owner,
+            'first' => $lastPageCount,
+            'after' => $after
+        ]);
+
         $repositoryIssues->add(
-            $this->github->getRepositoryIssuesPaginated([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => $lastPageCount,
-                'after' => $after
-            ])->nodes
+            $paginatedIssues->nodes
         );
 
-        Log::debug($i . ' of ' . $pages . ' of issues');
+        $repositoryIssues->setEndCursor($paginatedIssues->pageInfo->endCursor);
+
+        Log::debug($i . ' of ' . $pages . ' pages of issues');
 
 
         return $repositoryIssues;

@@ -187,14 +187,48 @@ class GithubRepositoryContributors
         $this->collection->put($contributorName, $contributor);
     }
 
+    public function registerEndCursor(string $type, string $cursor)
+    {
+        $endingCursors = $this->collection->get('endingCursors');
+
+        if ($endingCursors !== null) {
+            $endingCursors = $endingCursors->merge([
+                $type => $cursor
+            ]);
+        } else {
+            $endingCursors = collect([
+                $type => $cursor
+            ]);
+        }
+
+        $this->collection->put('endingCursors', $endingCursors);
+    }
+
+    public function registerCommitEndCursors(Collection $cursors)
+    {
+        $endingCursors = $this->collection->get('endingCursors');
+
+        if ($endingCursors !== null) {
+            $endingCursors = $endingCursors->merge([
+                'commits' => $cursors
+            ]);
+        } else {
+            $endingCursors = collect([
+                'commits' => $cursors
+            ]);
+        }
+
+        $this->collection->put('endingCursors', $endingCursors);
+    }
+
     public function get(): Collection
     {
-        return $this->collection;
+        return $this->collection->except('endingCursors');
     }
 
     public function getContributorsAssignedTo(string $pullRequestId): Collection
     {
-        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
+        return $this->collection->except('endingCursors')->filter(function ($contributor) use ($pullRequestId) {
             $pullRequest = $contributor->pullRequests->get($pullRequestId);
 
             return $pullRequest !== null && $pullRequest->assignedTo;
@@ -203,7 +237,7 @@ class GithubRepositoryContributors
 
     public function getContributorsCommitedTo(string $pullRequestId): Collection
     {
-        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
+        return $this->collection->except('endingCursors')->filter(function ($contributor) use ($pullRequestId) {
             return $contributor->commits->some(function ($commit) use ($pullRequestId) {
                 return $commit->pullRequest === $pullRequestId;
             });
@@ -212,7 +246,7 @@ class GithubRepositoryContributors
 
     public function getContributorsSuggestedForReviewTo(string $pullRequestId): Collection
     {
-        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
+        return $this->collection->except('endingCursors')->filter(function ($contributor) use ($pullRequestId) {
             $pullRequest = $contributor->pullRequests->get($pullRequestId);
 
             return $pullRequest !== null && $pullRequest->suggestedReviewerTo;
@@ -221,7 +255,7 @@ class GithubRepositoryContributors
 
     public function getContributorsReviewedTo(string $pullRequestId): Collection
     {
-        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
+        return $this->collection->except('endingCursors')->filter(function ($contributor) use ($pullRequestId) {
             $pullRequest = $contributor->pullRequests->get($pullRequestId);
 
             return $pullRequest !== null && $pullRequest->reviewedByHim;
