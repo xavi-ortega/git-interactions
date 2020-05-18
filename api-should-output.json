@@ -11,8 +11,9 @@
         "total": 124,
         "open": 13,
         "closed": 121,
-        "closed_by_bot": 0,
+
         "closed_less_than_one_hour": 0,
+
         "avg_time_to_close": "40:16"
     },
 
@@ -20,10 +21,14 @@
         "total": 67,
         "open": 5,
         "closed": 62,
+        "merged": 60,
+
         "closed_without_commits": 1,
         "closed_less_than_one_hour": 1,
         "merged_less_than_one_hour": 1,
+
         "prc_closed_with_commits": 97.8,
+
         "avg_commits_per_pr": 4,
         "avg_time_to_close": "40:16",
         "avg_time_to_merge": "40:16"
@@ -31,17 +36,21 @@
 
     "contributors": {
         "total": 15,
+        "avg_pull_request_contributed": 37,
+        "avg_time_to_push": "11:00",
+
         "avg_files_per_commit": 7,
         "avg_lines_per_commit": 221,
         "avg_lines_per_file_per_commit": 23,
-        "avg_pull_request_contributed": 37,
+
         "avg_prc_good_assignees": 60.3,
         "avg_prc_bad_assignees": 39.7,
         "avg_prc_unexpected_contributor": 2,
+
         "avg_prc_good_reviewers": 56.9,
         "avg_prc_bad_reviewers": 11.1,
         "avg_prc_unexpected_reviewers": 32,
-        "avg_time_to_push": "11:00",
+
         "prc_new_code": 35,
         "prc_rewrite_others_code": 37.3,
         "prc_rewrite_own_code": 27.7

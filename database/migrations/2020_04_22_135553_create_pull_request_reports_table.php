@@ -20,6 +20,7 @@ class CreatePullRequestReportsTable extends Migration
             $table->bigInteger('total');
             $table->bigInteger('open');
             $table->bigInteger('closed');
+            $table->bigInteger('merged');
             $table->bigInteger('closed_without_commits');
             $table->bigInteger('closed_less_than_one_hour');
             $table->bigInteger('merged_less_than_one_hour');

@@ -163,12 +163,6 @@ class RepositoriesController extends Controller
 
             if ($issue->closedBy !== null) {
                 $repositoryContributors->registerIssueAction($issue->closedBy, ACTION_CLOSE, $issueInfo);
-
-                if (Str::contains($issue->closedBy, [
-                    'bot', 'b0t'
-                ])) {
-                    $total->closedByBot++;
-                }
             }
 
             return $total;
@@ -176,7 +170,6 @@ class RepositoriesController extends Controller
             'issues' => 0,
             'open' => 0,
             'closed' => 0,
-            'closedByBot' => 0,
             'closedInLessThanOneHour' => 0,
             'closeTime' => collect()
         ]);
@@ -218,6 +211,8 @@ class RepositoriesController extends Controller
                 } else {
                     $total->commits += $pullRequest->totalCommits;
                 }
+            } else if ($pullRequest->merged) {
+                $total->merged++;
             } else {
                 $total->open++;
             }
@@ -271,6 +266,7 @@ class RepositoriesController extends Controller
             'pullRequests' => 0,
             'open' => 0,
             'closed' => 0,
+            'merged' => 0,
             'closedWithoutCommits' => 0,
             'closedInLessThanOneHour' => 0,
             'mergedInLessThanOneHour' => 0,
@@ -295,10 +291,11 @@ class RepositoriesController extends Controller
             'total' => $total->pullRequests,
             'open' => $total->open,
             'closed' => $total->closed,
+            'merged' => $total->merged,
             'closed_without_commits' => $total->closedWithoutCommits,
             'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
             'merged_less_than_one_hour' => $total->mergedInLessThanOneHour,
-            'prc_closed_with_commits' => 100 - round($total->closedWithoutCommits / $total->pullRequests, 2),
+            'prc_closed_with_commits' => 100 - round($total->closedWithoutCommits / $total->pullRequests * 100, 2),
             'avg_commits_per_pr' => $repositoryPullRequests->get()->pluck('totalCommits')->median(),
             'avg_time_to_close' => $avgTimeToClose->forHumans(),
             'avg_time_to_merge' => $avgTimeToMerge->forHumans()
@@ -385,7 +382,7 @@ class RepositoriesController extends Controller
                     return 0;
                 }
 
-                return round($good_assignees->count() / $totalContributors, 2);
+                return round($good_assignees->count() / $totalContributors * 100, 2);
             })->median(),
             'avg_prc_bad_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
                 $contributors = $pullRequest->contributorsCollection;
@@ -397,7 +394,7 @@ class RepositoriesController extends Controller
                     return $bad_assignees->count() > 0 ? 100 : 0;
                 }
 
-                return round($bad_assignees->count() / $totalContributors, 2);
+                return round($bad_assignees->count() / $totalContributors * 100, 2);
             })->median(),
             'avg_prc_unexpected_contributors' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
                 $contributors = $pullRequest->contributorsCollection;
@@ -409,7 +406,7 @@ class RepositoriesController extends Controller
                     return 0;
                 }
 
-                return round($unexpected_contributors->count() / $totalContributors, 2);
+                return round($unexpected_contributors->count() / $totalContributors * 100, 2);
             })->median(),
             'avg_prc_good_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
                 $reviewers = $pullRequest->reviewersCollection;
@@ -421,7 +418,7 @@ class RepositoriesController extends Controller
                     return 0;
                 }
 
-                return round($good_reviewers->count() / $totalReviewers, 2);
+                return round($good_reviewers->count() / $totalReviewers * 100, 2);
             })->median(),
             'avg_prc_bad_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
                 $reviewers = $pullRequest->reviewersCollection;
@@ -433,7 +430,7 @@ class RepositoriesController extends Controller
                     return $bad_reviewers->count() > 0 ? 100 : 0;
                 }
 
-                return round($bad_reviewers->count() / $totalReviewers, 2);
+                return round($bad_reviewers->count() / $totalReviewers * 100, 2);
             })->median(),
             'avg_prc_unexpected_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
                 $reviewers = $pullRequest->reviewersCollection;
@@ -445,7 +442,7 @@ class RepositoriesController extends Controller
                     return 0;
                 }
 
-                return round($unexpected_reviewers->count() / $totalReviewers, 2);
+                return round($unexpected_reviewers->count() / $totalReviewers * 100, 2);
             })->median(),
             'avg_time_to_push' => $avgTimeToPush->forHumans(),
             'prc_new_code' => 0,
