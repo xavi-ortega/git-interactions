@@ -28,10 +28,6 @@ class CreateContributorReportsTable extends Migration
             $table->decimal('avg_prc_good_reviewers');
             $table->decimal('avg_prc_bad_reviewers');
             $table->decimal('avg_prc_unexpected_reviewers');
-            $table->string('avg_time_to_push');
-            $table->decimal('prc_new_code');
-            $table->decimal('prc_rewrite_others_code');
-            $table->decimal('prc_rewrite_own_code');
 
             $table->timestamps();
         });

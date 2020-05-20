@@ -26,16 +26,6 @@ class GithubRepositoryBranches
         );
     }
 
-
-    public function addCommits(string $branchName, array $commits)
-    {
-        $branch = $this->collection->where('name', $branchName)->first();
-
-        $branch->commits = $branch->commits->merge(
-            $this->formatCommits($commits)
-        );
-    }
-
     public function setEndCursor(string $endCursor)
     {
         $this->endCursor = $endCursor;
@@ -46,26 +36,9 @@ class GithubRepositoryBranches
         return $this->endCursor;
     }
 
-    public function setCommitEndCursor(string $branch, string $endCursor)
-    {
-        $this->commitEndCursors->put($branch, $endCursor);
-    }
-
-    public function getCommitEndCursors(): Collection
-    {
-        return $this->commitEndCursors;
-    }
-
     public function get(): Collection
     {
         return $this->collection;
-    }
-
-    public function getCommits(string $branchName): Collection
-    {
-        $branch = $this->collection->where('name', $branchName)->first();
-
-        return $branch->commits->all ?? collect([]);
     }
 
     private function formatBranches(array $rawBranches)
@@ -77,26 +50,5 @@ class GithubRepositoryBranches
                 'commits' => collect([])
             ];
         }, $rawBranches);
-    }
-
-    private function formatCommits(array $rawCommits)
-    {
-        return array_map(function ($commit) {
-            $author = isset($commit->author) && isset($commit->author->user) ? $commit->author->user->login : null;
-
-            return (object) [
-                'id' => $commit->oid,
-                'url' => $commit->url,
-                'changedFiles' => $commit->changedFiles,
-                'additions' => $commit->additions,
-                'deletions' => $commit->deletions,
-                'committedAt' => $commit->committedDate,
-                'pushedAt' => $commit->pushedDate,
-                'author' => $author,
-                'pullRequests' => array_map(function ($pullRequest) {
-                    return $pullRequest->id;
-                }, $commit->associatedPullRequests->nodes),
-            ];
-        }, $rawCommits);
     }
 }

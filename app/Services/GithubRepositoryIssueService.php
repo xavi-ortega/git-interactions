@@ -19,30 +19,6 @@ class GithubRepositoryIssueService
 
     public function getRepositoryIssues(string $name, string $owner, int $total): GithubRepositoryIssues
     {
-        // if ($total > MAX_ISSUES) {
-        $repositoryIssues = $this->getRepositoryIssuesOverMax($name, $owner, $total);
-        // } else {
-        //     $repositoryIssues = $this->getRepositoryIssuesUnderMax($name, $owner, $total);
-        // }
-
-        return $repositoryIssues;
-    }
-
-    private function getRepositoryIssuesUnderMax(string $name, string $owner, int $total): GithubRepositoryIssues
-    {
-        $repositoryIssues = new GithubRepositoryIssues(
-            $this->github->getRepositoryIssues([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => $total
-            ])
-        );
-
-        return $repositoryIssues;
-    }
-
-    private function getRepositoryIssuesOverMax(string $name, string $owner, int $total): GithubRepositoryIssues
-    {
         $repositoryIssues = new GithubRepositoryIssues();
 
         $pages = floor($total / MAX_ISSUES + 1);

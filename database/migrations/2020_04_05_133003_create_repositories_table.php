@@ -22,6 +22,7 @@ class CreateRepositoriesTable extends Migration
             $table->string('owner');
             $table->string('description');
             $table->string('raw')->nullable();
+            $table->string('pointer')->nullable();
 
             $table->timestamps();
         });

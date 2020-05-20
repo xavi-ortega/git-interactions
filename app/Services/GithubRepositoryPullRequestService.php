@@ -20,30 +20,6 @@ class GithubRepositoryPullRequestsService
 
     public function getRepositoryPullRequests(string $name, string $owner, int $total): GithubRepositoryPullRequests
     {
-        // if ($total > MAX_PULL_REQUESTS) {
-        $repositoryPullRequests = $this->getRepositoryPullRequestsOverMax($name, $owner, $total);
-        // } else {
-        //     $repositoryPullRequests = $this->getRepositoryPullRequestsUnderMax($name, $owner, $total);
-        // }
-
-        return $repositoryPullRequests;
-    }
-
-    private function getRepositoryPullRequestsUnderMax(string $name, string $owner, int $total): GithubRepositoryPullRequests
-    {
-        $repositoryPullRequests = new GithubRepositoryPullRequests(
-            $this->github->getRepositoryPullRequests([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => $total
-            ])
-        );
-
-        return $repositoryPullRequests;
-    }
-
-    private function getRepositoryPullRequestsOverMax(string $name, string $owner, int $total): GithubRepositoryPullRequests
-    {
         $repositoryPullRequests = new GithubRepositoryPullRequests();
 
         $pages = floor($total / MAX_PULL_REQUESTS + 1);

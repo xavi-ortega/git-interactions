@@ -187,40 +187,6 @@ class GithubRepositoryContributors
         $this->collection->put($contributorName, $contributor);
     }
 
-    public function registerEndCursor(string $type, string $cursor)
-    {
-        $endingCursors = $this->collection->get('endingCursors');
-
-        if ($endingCursors !== null) {
-            $endingCursors = $endingCursors->merge([
-                $type => $cursor
-            ]);
-        } else {
-            $endingCursors = collect([
-                $type => $cursor
-            ]);
-        }
-
-        $this->collection->put('endingCursors', $endingCursors);
-    }
-
-    public function registerCommitEndCursors(Collection $cursors)
-    {
-        $endingCursors = $this->collection->get('endingCursors');
-
-        if ($endingCursors !== null) {
-            $endingCursors = $endingCursors->merge([
-                'commits' => $cursors
-            ]);
-        } else {
-            $endingCursors = collect([
-                'commits' => $cursors
-            ]);
-        }
-
-        $this->collection->put('endingCursors', $endingCursors);
-    }
-
     public function get(): Collection
     {
         return $this->collection->except('endingCursors');

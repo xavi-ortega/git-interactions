@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\CodeReport;
 use App\IssueReport;
 use App\ContributorReport;
 use App\PullRequestReport;
@@ -24,5 +25,10 @@ class Report extends Model
     public function contributors()
     {
         return $this->hasOne(ContributorReport::class);
+    }
+
+    public function code()
+    {
+        return $this->hasOne(CodeReport::class);
     }
 }

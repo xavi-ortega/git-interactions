@@ -90,13 +90,15 @@ class RepositoriesController extends Controller
 
         $cloned->checkout('master');
 
-        $cloned->getPatches($repository->name . '.log');
+        $cloned->logPatches($repository->name . '.log');
 
-        $patches = file_get_contents($clonePath . '/' . $repository->name . '.log');
+        $path = $clonePath . '/' . $repository->name . '.log';
 
-        $commits = $this->commitService->process($patches);
+        $start = microtime(true);
+        $commits = $this->commitService->process($path);
+        $time_elapsed_secs = microtime(true) - $start;
 
-        return response()->json($commits);
+        return response()->json(['commits' => count($commits), 'time' => $time_elapsed_secs]);
     }
 
     private function getOrCreateRepository(string $name, string $owner): Repository
@@ -134,9 +136,9 @@ class RepositoriesController extends Controller
 
             $raw = $repositoryContributors->get()->toJson();
 
-            $path = Storage::disk('raw')->put($repository->id . '/raw.json', $raw);
+            Storage::disk('raw')->put($repository->id . '/raw.json', $raw);
 
-            $repository->raw = $path;
+            $repository->raw = storage_path("app/raw/{$repository->id}/raw.json");
             $repository->save();
 
             $report = $user->reports()->create([
@@ -154,8 +156,6 @@ class RepositoriesController extends Controller
     private function makeIssuesReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
         $repositoryIssues = $this->issueService->getRepositoryIssues($name, $owner, $totalCount);
-
-        $repositoryContributors->registerEndCursor('issues', $repositoryIssues->getEndCursor());
 
         $oneHour = new DateInterval('PT1H');
 
@@ -219,8 +219,6 @@ class RepositoriesController extends Controller
     {
 
         $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($name, $owner, $totalCount);
-
-        $repositoryContributors->registerEndCursor('pullRequests', $repositoryPullRequests->getEndCursor());
 
         $oneHour = new DateInterval('PT1H');
 
@@ -329,9 +327,6 @@ class RepositoriesController extends Controller
     private function makeContributorsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
         $repositoryBranches = $this->branchService->getRepositoryBranches($name, $owner, $totalCount);
-
-        $repositoryContributors->registerEndCursor('branches', $repositoryBranches->getEndCursor());
-        $repositoryContributors->registerCommitEndCursors($repositoryBranches->getCommitEndCursors());
 
         $repositoryBranches->get()->each(function ($branch) use ($repositoryContributors) {
             $branch->commits->each(function ($commit) use ($branch, $repositoryContributors) {

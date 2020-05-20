@@ -49,10 +49,26 @@
 
         "avg_prc_good_reviewers": 56.9,
         "avg_prc_bad_reviewers": 11.1,
-        "avg_prc_unexpected_reviewers": 32,
+        "avg_prc_unexpected_reviewers": 32
+    },
+
+    "code": {
+        "branches": 10,
+        "branches_without_activity": 5,
 
         "prc_new_code": 35,
         "prc_rewrite_others_code": 37.3,
-        "prc_rewrite_own_code": 27.7
+        "prc_rewrite_own_code": 27.7,
+
+        "files": [
+            {
+                "name": "README.md",
+                "total": 30
+            },
+            {
+                "name": "main.ts",
+                "total": 27
+            }
+        ]
     }
 }
