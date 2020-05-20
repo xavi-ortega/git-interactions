@@ -2,29 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use App\Exceptions\RepositoryNotFoundException;
+use App\User;
+use App\Report;
 use DateInterval;
 use Carbon\Carbon;
 use App\Repository;
-use Carbon\CarbonInterval;
+
 use Illuminate\Support\Str;
-
 use Illuminate\Http\Request;
+use App\Helpers\GitRepository;
 use App\Helpers\GithubApiClient;
-use App\Services\GithubRepositoryService;
-use GuzzleHttp\Exception\ServerException;
-use App\Helpers\GithubRepositoryContributors;
+use Cz\Git\GitException;
 
-use App\Helpers\GithubRepositoryPullRequests;
-use App\Report;
+use App\Services\GitCommitService;
+use Illuminate\Support\Facades\Storage;
+use App\Services\GithubRepositoryService;
+
+use App\Helpers\GithubRepositoryContributors;
 use App\Services\GithubRepositoryIssueService;
 use App\Services\GithubRepositoryBranchService;
 use App\Services\GithubRepositoryPullRequestsService;
-use App\User;
-
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 const MAX_ISSUES = 100;
 
@@ -33,14 +31,16 @@ class RepositoriesController extends Controller
     private $repositoryService;
     private $issueService;
     private $pullRequestService;
-    private $branchesService;
+    private $branchService;
+    private $commitService;
 
     public function __construct()
     {
         $this->repositoryService = new GithubRepositoryService();
         $this->issueService = new GithubRepositoryIssueService();
         $this->pullRequestService = new GithubRepositoryPullRequestsService();
-        $this->branchesService = new GithubRepositoryBranchService();
+        $this->branchService = new GithubRepositoryBranchService();
+        $this->commitService = new GitCommitService();
     }
 
     public function rateLimit()
@@ -59,20 +59,44 @@ class RepositoriesController extends Controller
             'owner' => 'required'
         ]);
 
-        try {
-            $repository = $this->getOrCreateRepository($request->name, $request->owner);
+        $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-            $report = $this->getOrCreateReport($repository);
+        // try {
+        //     $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-            return response()->json([
-                'repo' => $repository,
-                'issues' => $report->issues,
-                'pullRequests' => $report->pull_requests,
-                'contributors' => $report->contributors
-            ]);
-        } catch (RepositoryNotFoundException $e) {
-            return response()->json(['error' => 'Repository not found'], 404);
+        //     $report = $this->getOrCreateReport($repository);
+
+        //     return response()->json([
+        //         'repo' => $repository,
+        //         'issues' => $report->issues,
+        //         'pullRequests' => $report->pull_requests,
+        //         'contributors' => $report->contributors
+        //     ]);
+        // } catch (RepositoryNotFoundException $e) {
+        //     return response()->json(['error' => 'Repository not found'], 404);
+        // }
+
+        $clonePath = storage_path('app/raw/' . $repository->id . '/clone');
+
+        if (!is_dir($clonePath)) {
+            mkdir($clonePath, 0777, true);
         }
+
+        try {
+            $cloned = GitRepository::cloneRepository($repository->url, $clonePath);
+        } catch (GitException $e) {
+            $cloned = new GitRepository($clonePath);
+        }
+
+        $cloned->checkout('master');
+
+        $cloned->getPatches($repository->name . '.log');
+
+        $patches = file_get_contents($clonePath . '/' . $repository->name . '.log');
+
+        $commits = $this->commitService->process($patches);
+
+        return response()->json($commits);
     }
 
     private function getOrCreateRepository(string $name, string $owner): Repository
@@ -304,7 +328,7 @@ class RepositoriesController extends Controller
 
     private function makeContributorsReport(string $name, string $owner, int $totalCount, GithubRepositoryContributors $repositoryContributors)
     {
-        $repositoryBranches = $this->branchesService->getRepositoryBranches($name, $owner, $totalCount);
+        $repositoryBranches = $this->branchService->getRepositoryBranches($name, $owner, $totalCount);
 
         $repositoryContributors->registerEndCursor('branches', $repositoryBranches->getEndCursor());
         $repositoryContributors->registerCommitEndCursors($repositoryBranches->getCommitEndCursors());

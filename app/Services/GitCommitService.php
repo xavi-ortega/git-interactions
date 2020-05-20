@@ -2,82 +2,136 @@
 
 namespace App\Services;
 
-use App\Helpers\GitParser;
-use Carbon\Carbon;
 use Exception;
+use Carbon\Carbon;
+use App\Helpers\GitParser;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+
+const NEW_LINE = '/\r\n|\r|\n/';
 
 class GitCommitService
 {
-    public function process(string $patches)
+    public function process(string $patches): Collection
     {
-        $parser = new GitParser($patches);
+        Log::debug('Start processing');
+        $parser = new GitParser(trim($patches));
 
-        $commits = [];
+        $commits = collect();
 
         while ($parser->hasNext()) {
-            $commits[] = (object) [
-                'id' => $this->processHash($parser),
+            Log::info('Processing id');
+            $id = $this->processHash($parser);
+
+            Log::info('Commit: ' . $id);
+
+            $commits->put($id, (object) [
+                'id' => $id,
                 'author' => $this->processAuthor($parser),
                 'date' => $this->processDate($parser),
                 'diffs' => $this->processDiffs($parser)
-            ];
+            ]);
         }
+
+        return $commits;
     }
 
     private function processHash(GitParser $parser): string
     {
-        $hashes = preg_split(" ", $parser->expect('string', 'commit ')->acceptUntil('string', '\n'));
+        $hashes = explode(" ", $parser->expect('string', 'commit ')->acceptUntil('regexp', NEW_LINE));
 
         return $hashes[0];
     }
 
     private function processAuthor(GitParser $parser): string
     {
-        return $parser
+        $author = trim($parser
             ->skipUntil('string', 'Author: ')
-            ->expect('string', 'Author: ')
-            ->acceptUntil('string', '\n');
+            ->skip('string', 'Author: ')
+            ->acceptUntil('regexp', NEW_LINE));
+
+        Log::info('Author: ' . $author);
+
+        return  explode(" >", $author)[0];
     }
 
     private function processDate(GitParser $parser): Carbon
     {
-        $timeString = $parser
-            ->skip('string', '\n')
-            ->expect('string', 'Date:')
-            ->skipSpaces()
-            ->acceptUntil('string', '\n');
+        $timeString = trim($parser
+            ->skipUntil('string', 'Date: ')
+            ->expect('string', 'Date: ')
+            ->acceptUntil('regexp', NEW_LINE));
 
-        return Carbon::make($timeString);
+        Log::info('Date: ' . $timeString);
+
+        while (true) {
+            try {
+                Log::info('Try conversion: ' . $timeString);
+                return Carbon::make($timeString);
+            } catch (Exception $e) {
+                $timeString = mb_substr($timeString, 1);
+
+                if (mb_strlen($timeString) <= 0) {
+                    throw new Exception("Date KO at " . $parser->toString());
+                }
+            }
+        }
     }
 
     private function processFileDiff(GitParser $parser)
     {
-        [$oldFile, $newFile] = array_map(function ($file) {
-            return mb_substr($file, 2);
-        }, preg_split(' ', $parser->expect('string', 'diff --git ')->acceptUntil('string', '\n')));
+        // [$oldFile, $newFile] = array_map(function ($file) {
+        //     return mb_substr($file, 2);
+        // }, explode(' ', $parser->expect('string', 'diff --git ')->acceptUntil('regexp', NEW_LINE)));
+        try {
+            $oldFile = trim($parser
+                ->skipUntil('string', '---')
+                ->expect('string', '---')
+                ->acceptUntil('regexp', NEW_LINE));
+
+
+            $newFile = trim($parser
+                ->skipUntil('string', '+++')
+                ->expect('string', '+++')
+                ->acceptUntil('regexp', NEW_LINE));
+        } catch (Exception $e) {
+            dd('No files', $parser->text);
+        }
 
         if ($oldFile !== '/dev/null' && $oldFile !== $newFile) {
-            // file deleted $oldFile
+            // file renamed $oldFile
         }
 
         if ($newFile === '/dev/null') {
             // file deleted $oldFile
         }
 
-        $matches = [];
+        // $matches = [];
+        // try {
+        $diffData = $parser->skipUntil('string', '@@ -')->accept('regexp', '/@@[^\n]*\n/');
+        // } catch (Exception $e) {
+        //     dd($parser->skipUntil('string', '@@ -')->accept('regexp', '/@@[^\n]*\n/'), $parser);
+        // }
+
         preg_match(
-            '/@@ -(\d+),(\d+) \+(\d+),(\d+) @@[^\n]*\n/',
-            $parser->skipUntil('string', '\n@@ -')->skip('string', '\n')->accept('regexp', '/@@[^\n]*\n/'),
+            '/@@ (-(\d+),(\d+) \+(\d+),(\d+)|-(\d+),(\d+) \+(\d+)) @@[^\n]*\n/',
+            $diffData,
             $matches
         );
 
-        [, $oldStart,, $newStart] = $matches;
+        if (count($matches) === 6) {
+            [,, $oldStart, $oldEnd, $newStart, $newEnd] = $matches;
+        } else if (count($matches) === 9) {
+            [,,,,,, $oldStart, $oldEnd, $newStart] = $matches;
+        } else {
+            dd(['unexpected diffData', $diffData, $matches, $parser->toString()]);
+        }
 
         [$oldStart, $newStart] = [+$oldStart, +$newStart];
 
         return (object) [
-            'oldFile' => $oldFile,
-            'newFile' => $newFile,
+            'oldFile' => $oldFile === '/dev/null' ? 'deleted' : mb_substr($oldFile, 2),
+            'newFile' => $newFile === '/dev/null' ? 'deleted' : mb_substr($newFile, 2),
             'oldStart' => $oldStart,
             'newStart' => $newStart
         ];
@@ -85,7 +139,7 @@ class GitCommitService
 
     private function processDiff(GitParser $parser)
     {
-        if ($parser->peek('string', 'diff --git')) {
+        if ($parser->skipUntil('string', 'diff --git')->peek('string', 'diff --git')) {
             return $this->processFileDiff($parser);
         }
 
@@ -93,21 +147,23 @@ class GitCommitService
             // processMergeDiff
         }
 
-        throw new Exception("Unknown diff " + $parser->toString());
+        dd('unkown diff', $parser->text);
+        throw new Exception("Unknown diff " . $parser->toString());
     }
 
     private function processDiffs(GitParser $parser)
     {
-        $parser->skipUntil('string', '\ndiff ');
+        $parser->skipUntil('regexp', NEW_LINE)->skipUntil('string', 'diff ');
 
         $diffs = [];
 
-        while ($parser->skip('regexp', '/\n*/')->peek('regexp', '/^diff/')) {
-            $diff = $parser->acceptUntil('regexp', '/\n+(diff|commit)/');
-            $diffs[] = $this->processDiff(new GitParser($diff));
+        while ($parser->skipUntil('regexp', '/(diff|commit)/')->peek('string', 'diff')) {
+            $diff = $parser->acceptUntil('regexp', '/(\r\n|\r|\n)+(diff|commit)/');
+            $diffs[] = $this->processDiff(new GitParser(trim($diff)));
+            // $parser->skip('string', 'diff');
         }
 
-        $parser->skip('regexp', '/\n*/');
+        // $parser->skip('regexp', NEW_LINE);
 
         return $diffs;
     }
