@@ -8,6 +8,6 @@ class GitRepository extends BaseGitRepository
 {
     public function logPatches(string $outputFile)
     {
-        return $this->begin()->run('git log -p --reverse > ' . $outputFile);
+        return $this->begin()->run('git log -p --reverse -U0 > ' . $outputFile);
     }
 }

@@ -390,7 +390,10 @@ class GithubApiClient
                         commits: target {
                             ... on Commit {
                                 history (first: 1) {
-                                    totalCount
+                                    totalCount,
+                                    nodes {
+                                      pushedDate
+                                    }
                                 }
                             }
                         }
@@ -425,7 +428,10 @@ class GithubApiClient
                         commits: target {
                             ... on Commit {
                                 history (first: 1) {
-                                    totalCount
+                                    totalCount,
+                                    nodes {
+                                      pushedDate
+                                    }
                                 }
                             }
                         }

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryContributors;
+use App\Helpers\GithubRepositoryActions;
 
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
 
@@ -51,13 +51,13 @@ class MakePullRequestsReport implements ShouldQueue
         $raw = json_decode(Storage::disk('raw')->get($rawPath));
 
         $pointer = collect($rawPointer);
-        $repositoryContributors = new GithubRepositoryContributors($raw);
+        $repositoryActions = new GithubRepositoryActions($raw);
 
         $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($this->repository->name, $this->repository->owner, $this->totalPullRequests);
 
         $oneHour = new DateInterval('PT1H');
 
-        $total = $repositoryPullRequests->get()->reduce(function ($total, $pullRequest) use ($repositoryContributors, $oneHour) {
+        $total = $repositoryPullRequests->get()->reduce(function ($total, $pullRequest) use ($repositoryActions, $oneHour) {
             $total->pullRequests++;
 
             if ($pullRequest->closed) {
@@ -95,27 +95,27 @@ class MakePullRequestsReport implements ShouldQueue
             }
 
             if ($pullRequest->author !== null) {
-                $repositoryContributors->registerPullRequestAction($pullRequest->author, ACTION_OPEN, $pullRequestInfo);
+                $repositoryActions->registerPullRequestAction($pullRequest->author, ACTION_OPEN, $pullRequestInfo);
             }
 
             if ($pullRequest->closedBy !== null) {
-                $repositoryContributors->registerPullRequestAction($pullRequest->closedBy, ACTION_CLOSE, $pullRequestInfo);
+                $repositoryActions->registerPullRequestAction($pullRequest->closedBy, ACTION_CLOSE, $pullRequestInfo);
             }
 
             if ($pullRequest->mergedBy !== null) {
-                $repositoryContributors->registerPullRequestAction($pullRequest->mergedBy, ACTION_MERGE, $pullRequestInfo);
+                $repositoryActions->registerPullRequestAction($pullRequest->mergedBy, ACTION_MERGE, $pullRequestInfo);
             }
 
             foreach ($pullRequest->assignees as $assignee) {
-                $repositoryContributors->registerPullRequestAction($assignee, ACTION_ASSIGN, $pullRequestInfo);
+                $repositoryActions->registerPullRequestAction($assignee, ACTION_ASSIGN, $pullRequestInfo);
             }
 
             foreach ($pullRequest->suggestedReviewers as $suggestedReviewer) {
-                $repositoryContributors->registerPullRequestAction($suggestedReviewer, ACTION_SUGGESTED_REVIEWER, $pullRequestInfo);
+                $repositoryActions->registerPullRequestAction($suggestedReviewer, ACTION_SUGGESTED_REVIEWER, $pullRequestInfo);
             }
 
             foreach ($pullRequest->reviewers as $reviewer) {
-                $repositoryContributors->registerPullRequestAction($reviewer, ACTION_REVIEW, $pullRequestInfo);
+                $repositoryActions->registerPullRequestAction($reviewer, ACTION_REVIEW, $pullRequestInfo);
             }
 
             return $total;
@@ -162,7 +162,7 @@ class MakePullRequestsReport implements ShouldQueue
         $pointer->put('issue', $repositoryPullRequests->getEndCursor());
 
         $rawPointer = $pointer->toJSon();
-        $raw = $repositoryContributors->get()->toJson();
+        $raw = $repositoryActions->get()->toJson();
 
         Storage::disk('raw')->put($pointerPath, $rawPointer);
         Storage::disk('raw')->put($rawPath, $raw);

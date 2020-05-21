@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryContributors;
+use App\Helpers\GithubRepositoryActions;
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE};
 
 class MakeIssuesReport implements ShouldQueue
@@ -60,13 +60,13 @@ class MakeIssuesReport implements ShouldQueue
 
 
         $pointer = collect($rawPointer);
-        $repositoryContributors = new GithubRepositoryContributors($raw);
+        $repositoryActions = new GithubRepositoryActions($raw);
 
         $repositoryIssues = $this->issueService->getRepositoryIssues($this->repository->name, $this->repository->owner, $this->totalIssues);
 
         $oneHour = new DateInterval('PT1H');
 
-        $total = $repositoryIssues->get()->reduce(function ($total, $issue) use ($repositoryContributors, $oneHour) {
+        $total = $repositoryIssues->get()->reduce(function ($total, $issue) use ($repositoryActions, $oneHour) {
             $total->issues++;
 
             if ($issue->closed) {
@@ -89,11 +89,11 @@ class MakeIssuesReport implements ShouldQueue
             }
 
             if ($issue->author !== null) {
-                $repositoryContributors->registerIssueAction($issue->author, ACTION_OPEN, $issueInfo);
+                $repositoryActions->registerIssueAction($issue->author, ACTION_OPEN, $issueInfo);
             }
 
             if ($issue->closedBy !== null) {
-                $repositoryContributors->registerIssueAction($issue->closedBy, ACTION_CLOSE, $issueInfo);
+                $repositoryActions->registerIssueAction($issue->closedBy, ACTION_CLOSE, $issueInfo);
             }
 
             return $total;
@@ -115,7 +115,7 @@ class MakeIssuesReport implements ShouldQueue
         $pointer->put('issue', $repositoryIssues->getEndCursor());
 
         $rawPointer = $pointer->toJSon();
-        $raw = $repositoryContributors->get()->toJson();
+        $raw = $repositoryActions->get()->toJson();
 
         Storage::disk('raw')->put($pointerPath, $rawPointer);
         Storage::disk('raw')->put($rawPath, $raw);

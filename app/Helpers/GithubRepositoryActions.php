@@ -13,7 +13,7 @@ const ACTION_REVIEW = 'review';
 const ACTION_COMMIT_PR = 'commit-pr';
 const ACTION_COMMIT_BRANCH = 'commit-branch';
 
-class GithubRepositoryContributors
+class GithubRepositoryActions
 {
     private $collection;
 
@@ -144,6 +144,16 @@ class GithubRepositoryContributors
         $this->collection->put($contributorName, $contributor);
     }
 
+    public function registerBranchAction(Object $branch)
+    {
+        $contributor = $this->getOrCreateContributor($contributorName);
+
+        $contributor->commits->put($branch->name, $branch);
+
+        $this->collection->put($contributorName, $contributor);
+    }
+
+
     public function registerCommitAction(string $contributorName, string $action, Object $commitInfo)
     {
         $contributor = $this->getOrCreateContributor($contributorName);
@@ -164,11 +174,9 @@ class GithubRepositoryContributors
             $commit = (object) [
                 'id' => $commitInfo->id,
                 'pullRequest' => 0,
-                'branch' => 0,
                 'changedFiles' => $commitInfo->changedFiles,
                 'changedLines' => $commitInfo->changedLines,
                 'linesPerFile' => round($commitInfo->changedLines / $commitInfo->changedFiles),
-                'timeToPush' => $commitInfo->timeToPush
             ];
 
             switch ($action) {
@@ -240,6 +248,7 @@ class GithubRepositoryContributors
             'issues' => collect(),
             'pullRequests' => collect(),
             'commits' => collect(),
+            'branches' => collect()
         ];
 
         $this->collection->put($contributorName, $contributor);

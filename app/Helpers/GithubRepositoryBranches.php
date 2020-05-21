@@ -44,10 +44,12 @@ class GithubRepositoryBranches
     private function formatBranches(array $rawBranches)
     {
         return array_map(function ($branch) {
+            $lastActivity = count($branch->commits->history->nodes) > 1 ? $branch->commits->history->nodes[0]->pushedDate : null;
+
             return (object) [
                 'name' => $branch->name,
                 'totalCommits' => $branch->commits->history->totalCount,
-                'commits' => collect([])
+                'lastActivity' => $lastActivity
             ];
         }, $rawBranches);
     }

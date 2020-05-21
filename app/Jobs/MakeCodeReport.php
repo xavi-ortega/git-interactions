@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryContributors;
+use App\Helpers\GithubRepositoryActions;
 
 class MakeCodeReport implements ShouldQueue
 {
@@ -45,7 +45,7 @@ class MakeCodeReport implements ShouldQueue
         $raw = json_decode(Storage::disk('raw')->get($rawPath));
 
         $pointer = collect($rawPointer);
-        $repositoryContributors = new GithubRepositoryContributors($raw);
+        $repositoryActions = new GithubRepositoryActions($raw);
 
         // NEW CODE REPORT
 

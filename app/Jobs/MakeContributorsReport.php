@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryContributors;
+use App\Helpers\GithubRepositoryActions;
 
 class MakeContributorsReport implements ShouldQueue
 {
@@ -48,13 +48,13 @@ class MakeContributorsReport implements ShouldQueue
         $raw = json_decode(Storage::disk('raw')->get($rawPath));
 
         $pointer = collect($rawPointer);
-        $repositoryContributors = new GithubRepositoryContributors($raw);
+        $repositoryActions = new GithubRepositoryActions($raw);
 
         $repositoryBranches = $this->branchService->getRepositoryBranches($this->repository->name, $this->repository->owner, $this->totalBranches);
 
         // NEW COMMITS PARSER
 
-        $contributors = $repositoryContributors->get()->flatten(1)->reduce(function ($contributors, $contributor) {
+        $contributors = $repositoryActions->get()->flatten(1)->reduce(function ($contributors, $contributor) {
             return (object) [
                 'issues' => $contributors->issues->merge($contributor->issues),
                 'pullRequests' => $contributors->pullRequests->merge($contributor->pullRequests),
@@ -66,9 +66,9 @@ class MakeContributorsReport implements ShouldQueue
             'commits' => collect()
         ]);
 
-        $pullRequests = $contributors->pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
-            $pullRequest->contributorsCollection = $repositoryContributors->getContributorsCommitedTo($pullRequest->id);
-            $pullRequest->reviewersCollection = $repositoryContributors->getContributorsReviewedTo($pullRequest->id);
+        $pullRequests = $contributors->pullRequests->map(function ($pullRequest) use ($repositoryActions) {
+            $pullRequest->contributorsCollection = $repositoryActions->getContributorsCommitedTo($pullRequest->id);
+            $pullRequest->reviewersCollection = $repositoryActions->getContributorsReviewedTo($pullRequest->id);
 
             return $pullRequest;
         });
@@ -82,16 +82,16 @@ class MakeContributorsReport implements ShouldQueue
         );
 
         $this->report->issues()->create([
-            'total' => $repositoryContributors->get()->count(),
+            'total' => $repositoryActions->get()->count(),
             'avg_files_per_commit' => floor($contributors->commits->pluck('changedFiles')->median()),
             'avg_lines_per_commit' => floor($contributors->commits->pluck('changedLines')->median()),
             'avg_lines_per_file_per_commit' => floor($contributors->commits->pluck('linesPerFile')->median()),
-            'avg_pull_request_contributed' => $repositoryContributors->get()->map(function ($contributor) {
+            'avg_pull_request_contributed' => $repositoryActions->get()->map(function ($contributor) {
                 return $contributor->pullRequests->count();
             })->median(),
-            'avg_prc_good_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            'avg_prc_good_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
                 $contributors = $pullRequest->contributorsCollection;
-                $good_assignees = $contributors->intersect($repositoryContributors->getContributorsAssignedTo($pullRequest->id));
+                $good_assignees = $contributors->intersect($repositoryActions->getContributorsAssignedTo($pullRequest->id));
 
                 $totalContributors = $contributors->count();
 
@@ -101,9 +101,9 @@ class MakeContributorsReport implements ShouldQueue
 
                 return round($good_assignees->count() / $totalContributors * 100, 2);
             })->median(),
-            'avg_prc_bad_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            'avg_prc_bad_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
                 $contributors = $pullRequest->contributorsCollection;
-                $bad_assignees = $repositoryContributors->getContributorsAssignedTo($pullRequest->id)->diff($contributors);
+                $bad_assignees = $repositoryActions->getContributorsAssignedTo($pullRequest->id)->diff($contributors);
 
                 $totalContributors = $contributors->count();
 
@@ -113,9 +113,9 @@ class MakeContributorsReport implements ShouldQueue
 
                 return round($bad_assignees->count() / $totalContributors * 100, 2);
             })->median(),
-            'avg_prc_unexpected_contributors' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            'avg_prc_unexpected_contributors' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
                 $contributors = $pullRequest->contributorsCollection;
-                $unexpected_contributors = $contributors->diff($repositoryContributors->getContributorsAssignedTo($pullRequest->id));
+                $unexpected_contributors = $contributors->diff($repositoryActions->getContributorsAssignedTo($pullRequest->id));
 
                 $totalContributors = $contributors->count();
 
@@ -125,9 +125,9 @@ class MakeContributorsReport implements ShouldQueue
 
                 return round($unexpected_contributors->count() / $totalContributors * 100, 2);
             })->median(),
-            'avg_prc_good_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            'avg_prc_good_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
                 $reviewers = $pullRequest->reviewersCollection;
-                $good_reviewers = $reviewers->intersect($repositoryContributors->getContributorsSuggestedForReviewTo($pullRequest->id));
+                $good_reviewers = $reviewers->intersect($repositoryActions->getContributorsSuggestedForReviewTo($pullRequest->id));
 
                 $totalReviewers = $reviewers->count();
 
@@ -137,9 +137,9 @@ class MakeContributorsReport implements ShouldQueue
 
                 return round($good_reviewers->count() / $totalReviewers * 100, 2);
             })->median(),
-            'avg_prc_bad_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            'avg_prc_bad_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
                 $reviewers = $pullRequest->reviewersCollection;
-                $bad_reviewers = $repositoryContributors->getContributorsSuggestedForReviewTo($pullRequest->id)->diff($reviewers);
+                $bad_reviewers = $repositoryActions->getContributorsSuggestedForReviewTo($pullRequest->id)->diff($reviewers);
 
                 $totalReviewers = $reviewers->count();
 
@@ -149,9 +149,9 @@ class MakeContributorsReport implements ShouldQueue
 
                 return round($bad_reviewers->count() / $totalReviewers * 100, 2);
             })->median(),
-            'avg_prc_unexpected_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryContributors) {
+            'avg_prc_unexpected_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
                 $reviewers = $pullRequest->reviewersCollection;
-                $unexpected_reviewers = $reviewers->diff($repositoryContributors->getContributorsSuggestedForReviewTo($pullRequest->id));
+                $unexpected_reviewers = $reviewers->diff($repositoryActions->getContributorsSuggestedForReviewTo($pullRequest->id));
 
                 $totalReviewers = $reviewers->count();
 

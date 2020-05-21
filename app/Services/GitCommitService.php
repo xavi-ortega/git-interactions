@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
-use App\Exceptions\ParseEndedException;
 use Exception;
 use Carbon\Carbon;
 use App\Helpers\GitParser;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Exceptions\ParseEndedException;
 
 class GitCommitService
 {
@@ -37,18 +38,21 @@ class GitCommitService
 
     private function processHash(GitParser $parser): string
     {
-        $hash = $parser->skipUntilStartsWith('commit')->getLine()->after('commit ');
+        $hash = $parser->skipUntilStartsWith('commit')->getLine()->after('commit ')->trim();
 
         return $hash;
     }
 
-    private function processAuthor(GitParser $parser): string
+    private function processAuthor(GitParser $parser): object
     {
-        $author = $parser->skipUntilStartsWith('Author: ')->getLine()->after('Author: ');
+        $author = $parser->skipUntilStartsWith('Author: ')->getLine()->after('Author: ')->trim();
 
         Log::info('Author: ' . $author);
 
-        return explode(" <", $author)[0];
+        return (object) [
+            'name' => explode(" <", $author)[0],
+            'email' => explode(">", explode(" <", $author)[1])[0]
+        ];
     }
 
     private function processDate(GitParser $parser): Carbon
@@ -60,14 +64,14 @@ class GitCommitService
         return Carbon::make((string) $timeString);
     }
 
-    private function processDiffs(GitParser $parser)
+    private function processDiffs(GitParser $parser): Collection
     {
-        $diffs = [];
+        $diffs = collect();
 
         $processDiff = $parser->skipUntilStartsWith('diff', 'commit')->contains('diff');
 
         while ($processDiff) {
-            $diffs[] = $this->processDiff($parser);
+            $diffs->push($this->processDiff($parser));
 
             try {
                 $processDiff = $parser->skipUntilStartsWith('diff', 'commit')->contains('diff');
@@ -79,7 +83,7 @@ class GitCommitService
         return $diffs;
     }
 
-    private function processDiff(GitParser $parser)
+    private function processDiff(GitParser $parser): object
     {
         if ($parser->contains('diff --git')) {
             return $this->processFileDiff($parser);
@@ -92,16 +96,22 @@ class GitCommitService
         throw new Exception("Unknown diff at " . $parser->getLine());
     }
 
-    private function processFileDiff(GitParser $parser)
+    private function processFileDiff(GitParser $parser): object
     {
 
         $parser->skipLine();
 
         if ($parser->contains('similarity index')) {
-            // rename file
+            $oldFile = $parser->skipUntilStartsWith('rename from ')->getLine()->after('rename from ')->trim();
+            $newFile = $parser->skipUntilStartsWith('rename to ')->getLine()->after('rename to ')->trim();
+
+            return (object) [
+                'oldFile' => (string) $oldFile,
+                'newFile' => (string) $newFile
+            ];
         } else {
-            $oldFile = $parser->skipUntilStartsWith('--- ')->getLine()->after('--- ');
-            $newFile = $parser->skipUntilStartsWith('+++ ')->getLine()->after('+++ ');
+            $oldFile = $parser->skipUntilStartsWith('--- ')->getLine()->after('--- ')->trim();
+            $newFile = $parser->skipUntilStartsWith('+++ ')->getLine()->after('+++ ')->trim();
 
             if ($oldFile !== '/dev/null' && $oldFile !== $newFile) {
                 // file renamed $oldFile
@@ -111,24 +121,50 @@ class GitCommitService
                 // file deleted $oldFile
             }
 
-            $line = $parser->skipUntilStartsWith('@@ -')->getLine();
+            $patches = collect();
 
-            $matches =  [];
-            preg_match('/@@ -(\d+)?,?(\d+) \+(\d+)?,?(\d+) @@/', $line, $matches);
+            $line = $parser->skipUntilStartsWith('@@ -');
 
-            try {
-                [, $oldStart, $oldEnd, $newStart, $newEnd] = $matches;
-            } catch (Exception $e) {
-                dd($line, $matches);
+            while ($parser->contains('@@ -')) {
+                $line = $parser->getLine();
+
+                $matches =  [];
+                preg_match('/@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@/', $line, $matches);
+
+                try {
+                    if (count($matches) === 5) {
+                        [, $oldStart, $oldCount, $newStart, $newCount] = $matches;
+                    } else if (count($matches) === 4) {
+                        [, $oldStart, $oldCount, $newStart] = $matches;
+                        $newCount = null;
+                    } else {
+                        [, $oldStart, $oldCount, $newStart, $newCount] = $matches;
+
+                        // check if fails for more exceptions
+                    }
+
+
+                    $patches->push([
+                        'oldStart' => $oldStart,
+                        'oldCount' => (string) Str::of($oldCount)->trim(','),
+                        'newStart' => $newStart,
+                        'newCount' => (string) Str::of($newCount)->trim(',')
+                    ]);
+                } catch (Exception $e) {
+                    dd($line, $matches);
+                }
+
+                try {
+                    $parser->skipUntilStartsWith('@@ -', 'diff', 'commit');
+                } catch (ParseEndedException $e) {
+                }
             }
 
+
             return (object) [
-                'oldFile' => $oldFile === '/dev/null' ? 'deleted' : mb_substr($oldFile, 2),
-                'newFile' => $newFile === '/dev/null' ? 'deleted' : mb_substr($newFile, 2),
-                'oldStart' => $oldStart,
-                'oldEnd' => $oldEnd,
-                'newStart' => $newStart,
-                'newEnd' => $newEnd
+                'oldFile' => $oldFile->contains('/dev/null') ? null : (string) $oldFile->substr(2),
+                'newFile' => $newFile->contains('/dev/null') ? null : (string) $newFile->substr(2),
+                'patches' => $patches
             ];
         }
     }
