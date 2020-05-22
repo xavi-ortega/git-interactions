@@ -144,11 +144,11 @@ class GitCommitService
                     }
 
 
-                    $patches->push([
-                        'oldStart' => $oldStart,
-                        'oldCount' => (string) Str::of($oldCount)->trim(','),
-                        'newStart' => $newStart,
-                        'newCount' => (string) Str::of($newCount)->trim(',')
+                    $patches->push((object) [
+                        'oldStart' => $oldStart || 0,
+                        'oldCount' => (string) Str::of($oldCount)->trim(',') || 0,
+                        'newStart' => $newStart || 0,
+                        'newCount' => (string) Str::of($newCount)->trim(',') || 0
                     ]);
                 } catch (Exception $e) {
                     dd($line, $matches);

@@ -3,24 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\User;
+use Exception;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
-use App\Repository;
 
+use App\Repository;
 use Cz\Git\GitException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use App\Helpers\GitRepository;
 
+use App\Helpers\GitRepository;
 use App\Helpers\GithubApiClient;
 use App\Services\GitCommitService;
-use Illuminate\Support\Facades\Storage;
 
+use Illuminate\Support\Facades\Storage;
 use App\Helpers\GithubRepositoryActions;
 use App\Services\GithubRepositoryService;
 use App\Services\GithubRepositoryIssueService;
+use App\Exceptions\RepositoryNotFoundException;
 use App\Services\GithubRepositoryBranchService;
 use App\Services\GithubRepositoryPullRequestsService;
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
@@ -62,20 +64,20 @@ class RepositoriesController extends Controller
 
         $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        // try {
-        //     $repository = $this->getOrCreateRepository($request->name, $request->owner);
+        try {
+            $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        //     $report = $this->getOrCreateReport($repository);
+            $report = $this->getOrCreateReport($repository);
 
-        //     return response()->json([
-        //         'repo' => $repository,
-        //         'issues' => $report->issues,
-        //         'pullRequests' => $report->pull_requests,
-        //         'contributors' => $report->contributors
-        //     ]);
-        // } catch (RepositoryNotFoundException $e) {
-        //     return response()->json(['error' => 'Repository not found'], 404);
-        // }
+            return response()->json([
+                'repo' => $repository,
+                'issues' => $report->issues,
+                'pullRequests' => $report->pull_requests,
+                'contributors' => $report->contributors
+            ]);
+        } catch (RepositoryNotFoundException $e) {
+            return response()->json(['error' => 'Repository not found'], 404);
+        }
 
         $clonePath = storage_path('app/raw/' . $repository->id . '/clone');
 
@@ -125,15 +127,15 @@ class RepositoriesController extends Controller
     {
         $user = User::find(1);
 
-        $report = $repository->reports()->first();
+        $report = null; //$repository->reports()->first();
 
         if ($report === null) {
             $repositoryActions = new GithubRepositoryActions();
             $repositoryMetrics = $this->repositoryService->getRepositoryMetrics($repository->name, $repository->owner);
 
-            $issuesReport = $this->makeIssuesReport($repository->name, $repository->owner, $repositoryMetrics->issues->totalCount, $repositoryActions);
-            $pullRequestsReport = $this->makePullRequestsReport($repository->name, $repository->owner, $repositoryMetrics->pullRequests->totalCount, $repositoryActions);
-            $contributorsReport = $this->makeContributorsReport($repository->name, $repository->owner, $repositoryMetrics->branches->totalCount, $repositoryActions);
+            $issuesReport = $this->makeIssuesReport($repository, $repositoryMetrics->issues->totalCount, $repositoryActions);
+            $pullRequestsReport = $this->makePullRequestsReport($repository, $repositoryMetrics->pullRequests->totalCount, $repositoryActions);
+            $contributorsReport = $this->makeContributorsReport($repository, $repositoryMetrics->branches->totalCount, $repositoryActions);
 
             $raw = $repositoryActions->get()->toJson();
 
@@ -154,15 +156,15 @@ class RepositoriesController extends Controller
         return $report;
     }
 
-    private function makeIssuesReport(string $name, string $owner, int $totalCount, GithubRepositoryActions $repositoryActions)
+    private function makeIssuesReport(Repository $repository, int $totalCount, GithubRepositoryActions $repositoryActions)
     {
-        $repositoryIssues = $this->issueService->getRepositoryIssues($name, $owner, $totalCount);
+        $repositoryIssues = $this->issueService->getRepositoryIssues($repository->name, $repository->owner, $totalCount);
 
         $oneHour = new DateInterval('PT1H');
 
-        $repositoryIssues->get()->each($repositoryActions->registerIssue);
+        $repositoryIssues->get()->each([$repositoryActions, 'registerIssue']);
 
-        $total = $repositoryActions->get()->issues->reduce(function ($total, $issue) use ($oneHour) {
+        $total = $repositoryActions->get('issues')->reduce(function ($total, $issue) use ($oneHour) {
             $total->issues++;
 
             if ($issue->closed) {
@@ -201,31 +203,30 @@ class RepositoriesController extends Controller
             'total' => $total->issues,
             'open' => $total->open,
             'closed' => $total->closed,
-            'closed_by_bot' => $total->closedByBot,
             'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
             'avg_time_to_close' => $avgTimeToClose->forHumans()
         ];
     }
 
-    private function makePullRequestsReport(string $name, string $owner, int $totalCount, GithubRepositoryActions $repositoryActions)
+    private function makePullRequestsReport(Repository $repository, int $totalCount, GithubRepositoryActions $repositoryActions)
     {
 
-        $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($name, $owner, $totalCount);
+        $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($repository->name, $repository->owner, $totalCount);
 
         $oneHour = new DateInterval('PT1H');
 
-        $repositoryPullRequests->get()->each($repositoryActions->registerPullRequest);
+        $repositoryPullRequests->get()->each([$repositoryActions, 'registerPullRequest']);
 
-        $total = $repositoryActions->get()->pullRequest->reduce(function ($total, $pullRequest) use ($oneHour) {
+        $total = $repositoryActions->get('pullRequests')->reduce(function ($total, $pullRequest) use ($oneHour) {
             $total->pullRequests++;
 
             if ($pullRequest->closed) {
                 $total->closed++;
 
-                if ($pullRequest->totalCommits <= 0) {
+                if ($pullRequest->commits <= 0) {
                     $total->closedWithoutCommits++;
                 } else {
-                    $total->commits += $pullRequest->totalCommits;
+                    $total->commits += $pullRequest->commits;
                 }
             } else if ($pullRequest->merged) {
                 $total->merged++;
@@ -315,27 +316,31 @@ class RepositoriesController extends Controller
 
         $repositoryCommits = $this->commitService->process($path);
 
-        $repositoryBranches->get()->each($repositoryActions->registerBranch);
-        $repositoryCommits->each($repositoryActions->registerCommit);
+        $repositoryBranches->get()->each([$repositoryActions, 'registerBranch']);
+        $repositoryCommits->each([$repositoryActions, 'registerCommit']);
 
         $actions = $repositoryActions->get();
 
         return [
-            'total' => $actions->contributors->count(),
-            'avg_files_per_commit' => floor($actions->commits->map(function ($commit) {
-                return $commit->pluck('diffs.newFile')->unique()->count();
+            'total' => $actions->get('contributors')->count(),
+            'avg_files_per_commit' => floor($actions->get('commits')->map(function ($commit) {
+                return $commit->diffs->pluck('newFile')->unique()->count();
             })->median()),
-            'avg_lines_per_commit' => floor($actions->commits->map(function ($commit) {
+            'avg_lines_per_commit' => floor($actions->get('commits')->map(function ($commit) {
                 return $commit->diffs->map(function ($diff) {
                     return $diff->patches->map(function ($patch) {
+                        // try {
                         return abs(
                             $patch->newStart - $patch->oldStart + $patch->newCount - $patch->oldCount
                         );
+                        // } catch (Exception $e) {
+                        //     dd($patch);
+                        // }
                     });
                 });
             })->median()),
-            'avg_lines_per_file_per_commit' => floor($actions->commits->map(function ($commit) {
-                $totalFiles = $commit->pluck('diffs.newFile')->unique()->count();
+            'avg_lines_per_file_per_commit' => floor($actions->get('commits')->map(function ($commit) {
+                $totalFiles = $commit->diffs->pluck('newFile')->unique()->count();
                 $totalLines = $commit->diffs->map(function ($diff) {
                     return $diff->patches->map(function ($patch) {
                         return abs(
@@ -346,12 +351,12 @@ class RepositoriesController extends Controller
 
                 return $totalLines / $totalFiles;
             })->median()),
-            'avg_pull_request_contributed' => floor($actions->contributors->map(function ($contributor) use ($actions) {
-                return $actions->pullRequests->filter(function ($pullRequest) use ($contributor) {
+            'avg_pull_request_contributed' => floor($actions->get('contributors')->map(function ($contributor) use ($actions) {
+                return $actions->get('pullRequests')->filter(function ($pullRequest) use ($contributor) {
                     return Arr::has($pullRequest->contributors, $contributor->user->login);
                 })->count();
             })->median()),
-            'avg_prc_good_assignees' => $actions->pullRequests->map(function ($pullRequest) {
+            'avg_prc_good_assignees' => $actions->get('pullRequests')->map(function ($pullRequest) {
                 $totalContributors = count($pullRequest->contributors);
 
                 if ($totalContributors <= 0) {
@@ -363,7 +368,7 @@ class RepositoriesController extends Controller
 
                 return round($goodAssignees->count() / $totalContributors * 100, 2);
             })->median(),
-            'avg_prc_bad_assignees' => $actions->pullRequests->map(function ($pullRequest) {
+            'avg_prc_bad_assignees' => $actions->get('pullRequests')->map(function ($pullRequest) {
                 $totalContributors = count($pullRequest->contributors);
 
                 if ($totalContributors <= 0) {
@@ -375,7 +380,7 @@ class RepositoriesController extends Controller
 
                 return round($badAssignees->count() / $totalContributors * 100, 2);
             })->median(),
-            'avg_prc_unexpected_contributors' => $actions->pullRequests->map(function ($pullRequest) {
+            'avg_prc_unexpected_contributors' => $actions->get('pullRequests')->map(function ($pullRequest) {
                 $totalContributors = count($pullRequest->contributors);
 
                 if ($totalContributors <= 0) {
@@ -387,7 +392,7 @@ class RepositoriesController extends Controller
 
                 return round($unexpectedContributors->count() / $totalContributors * 100, 2);
             })->median(),
-            'avg_prc_good_reviewers' => $actions->pullRequests->map(function ($pullRequest) {
+            'avg_prc_good_reviewers' => $actions->get('pullRequests')->map(function ($pullRequest) {
                 $totalReviewers = count($pullRequest->reviewers);
 
                 if ($totalReviewers <= 0) {
@@ -399,7 +404,7 @@ class RepositoriesController extends Controller
 
                 return round($goodReviewers->count() / $totalReviewers * 100, 2);
             })->median(),
-            'avg_prc_bad_reviewers' => $actions->pullRequests->map(function ($pullRequest) {
+            'avg_prc_bad_reviewers' => $actions->get('pullRequests')->map(function ($pullRequest) {
                 $totalReviewers = count($pullRequest->reviewers);
 
                 if ($totalReviewers <= 0) {
@@ -411,7 +416,7 @@ class RepositoriesController extends Controller
 
                 return round($badReviewers->count() / $totalReviewers * 100, 2);
             })->median(),
-            'avg_prc_unexpected_reviewers' => $actions->pullRequests->map(function ($pullRequest) {
+            'avg_prc_unexpected_reviewers' => $actions->get('pullRequests')->map(function ($pullRequest) {
                 $totalReviewers = count($pullRequest->reviewers);
 
                 if ($totalReviewers <= 0) {

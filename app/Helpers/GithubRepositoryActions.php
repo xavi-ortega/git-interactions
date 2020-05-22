@@ -32,18 +32,13 @@ class GithubRepositoryActions
         $this->collection = collect($actions);
     }
 
-    public function get(): Collection
+    public function get(string $type = ''): Collection
     {
-        return $this->collection;
-    }
-
-    public function getContributorsAssignedTo(string $pullRequestId): Collection
-    {
-        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
-            $pullRequest = $contributor->pullRequests->get($pullRequestId);
-
-            return $pullRequest !== null && $pullRequest->assignedTo;
-        })->keys();
+        if (empty($type)) {
+            return $this->collection;
+        } else {
+            return $this->collection->get($type);
+        }
     }
 
     public function getContributorsCommitedTo(string $pullRequestId): Collection
@@ -52,15 +47,6 @@ class GithubRepositoryActions
             return $contributor->commits->some(function ($commit) use ($pullRequestId) {
                 return $commit->pullRequest === $pullRequestId;
             });
-        })->keys();
-    }
-
-    public function getContributorsSuggestedForReviewTo(string $pullRequestId): Collection
-    {
-        return $this->collection->filter(function ($contributor) use ($pullRequestId) {
-            $pullRequest = $contributor->pullRequests->get($pullRequestId);
-
-            return $pullRequest !== null && $pullRequest->suggestedReviewerTo;
         })->keys();
     }
 
@@ -75,26 +61,26 @@ class GithubRepositoryActions
 
     public function registerIssue(object $issue)
     {
-        $this->collection->issues->put($issue->id, $issue);
+        $this->collection->get('issues')->put($issue->id, $issue);
     }
 
     public function registerPullRequest(object $pullRequest)
     {
-        $this->collection->pullRequests->put($pullRequest);
+        $this->collection->get('pullRequests')->put($pullRequest->id, $pullRequest);
     }
 
     public function registerBranch(Object $branch)
     {
-        $this->collection->branches->put($branch->name, $branch);
+        $this->collection->get('branches')->put($branch->name, $branch);
     }
 
     public function registerCommit(object $commit)
     {
-        $this->collection->put($commit->id, $commit);
+        $this->collection->get('commits')->put($commit->id, $commit);
     }
 
     public function registerContributor(object $contributor)
     {
-        $this->collection->put($contributor->email, $contributor);
+        $this->collection->get('contributors')->put($contributor->email, $contributor);
     }
 }
