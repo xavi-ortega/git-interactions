@@ -45,6 +45,8 @@ class GithubRepositoryPullRequests
                 return isset($closedEvent->actor) ? $closedEvent->actor->login : null;
             }, $pullRequest->closedEvent->nodes);
 
+            $contributors = collect($pullRequest->commits->nodes)->pluck('commit.author.user.login')->unique()->toArray();
+
             return (object) [
                 'id' => $pullRequest->id,
                 'author' => isset($pullRequest->author) ? $pullRequest->author->login : null,
@@ -58,13 +60,14 @@ class GithubRepositoryPullRequests
                 'assignees' => array_map(function ($assignee) {
                     return $assignee->login;
                 },  $pullRequest->assignees->nodes),
-                'reviewers' => array_map(function ($review) {
-                    return  isset($review->author) ? $review->author->login : null;
-                }, $pullRequest->reviews->nodes),
+                'contributors' => $contributors,
                 'suggestedReviewers' => array_map(function ($suggestedReviewer) {
                     return $suggestedReviewer->reviewer->login;
                 }, $pullRequest->suggestedReviewers),
-                'totalCommits' => $pullRequest->commits->totalCount
+                'reviewers' => array_map(function ($review) {
+                    return  isset($review->author) ? $review->author->login : null;
+                }, $pullRequest->reviews->nodes),
+                'commits' => $pullRequest->commits->totalCount
             ];
         }, $rawPullRequests);
     }

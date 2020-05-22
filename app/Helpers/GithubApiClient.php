@@ -55,9 +55,9 @@ class GithubApiClient
      *
      * cost: 0
      *
-     * @return Object
+     * @return object
      */
-    public function getRateLimit()
+    public function getRateLimit(): object
     {
         $query = (new Query('rateLimit'))->setSelectionSet([
             'limit',
@@ -75,9 +75,9 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return object
      */
-    public function getRepositoryInfo(array $params)
+    public function getRepositoryInfo(array $params): object
     {
         $query = (new Query('repository'))
             ->setVariables(
@@ -113,9 +113,9 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return object
      */
-    public function getRepositoryMetrics(array $params)
+    public function getRepositoryMetrics(array $params): object
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!){
@@ -143,7 +143,7 @@ class GithubApiClient
      * @param array $params
      * @return array
      */
-    public function getRepositoryIssues(array $params)
+    public function getRepositoryIssues(array $params): array
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$first: Int!) {
@@ -186,9 +186,9 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return object
      */
-    public function getRepositoryIssuesPaginated($params)
+    public function getRepositoryIssuesPaginated($params): object
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
@@ -236,7 +236,7 @@ class GithubApiClient
      * @param array $params
      * @return array
      */
-    public function getRepositoryPullRequests(array $params)
+    public function getRepositoryPullRequests(array $params): array
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$first: Int!) {
@@ -255,11 +255,6 @@ class GithubApiClient
                         mergedBy {
                             login
                         },
-                        assignees (first: 10) {
-                            nodes {
-                                login
-                            }
-                        },
 
                         closedEvent: timelineItems(last: 1, itemTypes: CLOSED_EVENT) {
                             nodes {
@@ -271,10 +266,22 @@ class GithubApiClient
                             }
                         },
 
-                        reviews (first: 10) {
+                        assignees (first: 10) {
                             nodes {
-                                author {
-                                    login
+                                login
+                            }
+                        },
+
+                        commits(first: 100) {
+                            totalCount,
+                            nodes {
+                                commit {
+                                    author {
+                                        user {
+                                            login,
+                                            email
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -285,8 +292,12 @@ class GithubApiClient
                             }
                         },
 
-                        commits {
-                            totalCount
+                        reviews (first: 10) {
+                            nodes {
+                                author {
+                                    login
+                                }
+                            }
                         }
                     }
 
@@ -304,9 +315,9 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return object
      */
-    public function getRepositoryPullRequestsPaginated(array $params)
+    public function getRepositoryPullRequestsPaginated(array $params): object
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
@@ -328,11 +339,6 @@ class GithubApiClient
                         mergedBy {
                             login
                         },
-                        assignees (first: 10) {
-                            nodes {
-                                login
-                            }
-                        },
 
                         closedEvent: timelineItems(last: 1, itemTypes: CLOSED_EVENT) {
                             nodes {
@@ -344,10 +350,21 @@ class GithubApiClient
                             }
                         },
 
-                        reviews (first: 10) {
+                        assignees (first: 10) {
                             nodes {
-                                author {
-                                    login
+                                login
+                            }
+                        },
+
+                        commits(first: 100) {
+                            totalCount,
+                            nodes {
+                                commit {
+                                    author {
+                                        user {
+                                            login
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -358,8 +375,12 @@ class GithubApiClient
                             }
                         },
 
-                        commits {
-                            totalCount
+                        reviews (first: 10) {
+                            nodes {
+                                author {
+                                    login
+                                }
+                            }
                         }
                     }
 
@@ -379,7 +400,7 @@ class GithubApiClient
      * @param array $params
      * @return array
      */
-    public function getRepositoryBranches(array $params)
+    public function getRepositoryBranches(array $params): array
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$first: Int!) {
@@ -412,9 +433,9 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return object
      */
-    public function getRepositoryBranchesPaginated(array $params)
+    public function getRepositoryBranchesPaginated(array $params): object
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$first: Int!, \$after: String = null) {
@@ -452,7 +473,7 @@ class GithubApiClient
      * @param array $params
      * @return array
      */
-    public function getRepositoryCommitsByBranch(array $params)
+    public function getRepositoryCommitsByBranch(array $params): array
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$branch: String!, \$first: Int!) {
@@ -498,9 +519,9 @@ class GithubApiClient
      * cost: 1
      *
      * @param array $params
-     * @return Object
+     * @return object
      */
-    public function getRepositoryCommitsByBranchPaginated(array $params)
+    public function getRepositoryCommitsByBranchPaginated(array $params): object
     {
         $query = <<<QUERY
         query (\$owner: String!, \$name: String!, \$branch: String!, \$first: Int!, \$after: String = null) {
@@ -541,6 +562,34 @@ class GithubApiClient
         QUERY;
 
         return $this->runRaw($query, $params)->getData()->repository->branch->commits->history;
+    }
+
+    /**
+     * Gets repository commit by id and returns author info
+     *
+     * @param array $params
+     * @return object
+     */
+    public function getRepositoryCommitById(array $params): object
+    {
+        $query = <<<QUERY
+        query (\$owner: String!, \$name: String!, \$oid: String!){
+            repository(owner: \$owner, name: \$name) {
+                commit: object(oid: \$oid) {
+                    ... on Commit {
+                        author {
+                            user {
+                                email,
+                                login
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        QUERY;
+
+        return $this->runRaw($query, $params)->getData()->repository->commit;
     }
 
     /**

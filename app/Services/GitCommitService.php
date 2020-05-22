@@ -162,8 +162,8 @@ class GitCommitService
 
 
             return (object) [
-                'oldFile' => $oldFile->contains('/dev/null') ? null : (string) $oldFile->substr(2),
-                'newFile' => $newFile->contains('/dev/null') ? null : (string) $newFile->substr(2),
+                'oldFile' => $oldFile->contains('/dev/null') ? "created: {$newFile->substr(2)}" : (string) $oldFile->substr(2),
+                'newFile' => $newFile->contains('/dev/null') ? "removed: {$oldFile->substr(2)}" : (string) $newFile->substr(2),
                 'patches' => $patches
             ];
         }
