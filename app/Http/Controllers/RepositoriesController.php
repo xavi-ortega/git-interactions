@@ -108,7 +108,7 @@ class RepositoriesController extends Controller
 
         $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        $report = $repository->reports()->firstOrFail();
+        $report = $repository->reports()->with('issues', 'pull_requests', 'contributors', 'code')->latest()->first();
 
         $time_elapsed_secs = microtime(true) - $start;
 

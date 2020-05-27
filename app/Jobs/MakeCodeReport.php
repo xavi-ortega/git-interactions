@@ -10,6 +10,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\GithubRepositoryActions;
+use App\Services\GithubRepositoryBranchService;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -43,7 +44,7 @@ class MakeCodeReport implements ShouldQueue
      *
      * @return void
      */
-    public function handle()
+    public function handle(GithubRepositoryBranchService $branchService)
     {
         // RETRIEVE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
@@ -55,7 +56,7 @@ class MakeCodeReport implements ShouldQueue
         $pointer = collect($rawPointer);
         $repositoryActions = new GithubRepositoryActions($raw);
 
-        $repositoryBranches = $this->branchService->getRepositoryBranches($this->repository->name, $this->repository->owner, $this->totalBranches);
+        $repositoryBranches = $branchService->getRepositoryBranches($this->repository->name, $this->repository->owner, $this->totalBranches);
 
         $repositoryBranches->get()->each([$repositoryActions, 'registerBranch']);
 

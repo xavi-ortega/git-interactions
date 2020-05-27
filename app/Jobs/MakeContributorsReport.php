@@ -101,6 +101,11 @@ class MakeContributorsReport implements ShouldQueue
             'avg_prc_bad_reviewers' => $this->getBadReviewers($actions)->median(),
             'avg_prc_unexpected_reviewers' => $this->getUnexpectedContributors($actions)->median()
         ]);
+
+        // UPDATE BACKUP
+        $raw = $repositoryActions->get()->toJson();
+
+        Storage::disk('raw')->put($rawPath, $raw);
     }
 
     private function getFilesPerCommit(Collection $actions): Collection
@@ -158,7 +163,7 @@ class MakeContributorsReport implements ShouldQueue
         return $contributorsWithUser->map(function ($contributor) use ($actions) {
             return $actions->get('pullRequests')->filter(function ($pullRequest) use ($contributor) {
                 try {
-                    return in_array($contributor->user->login, $pullRequest->contributors);
+                    return in_array($contributor->user->login, (array) $pullRequest->contributors);
                 } catch (Exception $e) {
                     dd($pullRequest);
                 }
@@ -168,15 +173,14 @@ class MakeContributorsReport implements ShouldQueue
 
     private function getGoodAssignees(Collection $actions): Collection
     {
-        dd($actions);
         return $actions->get('pullRequests')->map(function ($pullRequest) {
-            $totalContributors = count($pullRequest->contributors);
+            $totalContributors = count((array) $pullRequest->contributors);
 
             if ($totalContributors <= 0) {
                 return 0;
             }
 
-            $contributors = collect($pullRequest->contributors);
+            $contributors = collect((array) $pullRequest->contributors);
             $goodAssignees = $contributors->intersect($pullRequest->assignees);
 
             return round($goodAssignees->count() / $totalContributors * 100, 2);
@@ -186,14 +190,14 @@ class MakeContributorsReport implements ShouldQueue
     private function getBadAssignees(Collection $actions): Collection
     {
         return $actions->get('pullRequests')->map(function ($pullRequest) {
-            $totalContributors = count($pullRequest->contributors);
+            $totalContributors = count((array) $pullRequest->contributors);
 
             if ($totalContributors <= 0) {
                 return count($pullRequest->assignees) > 0 ? 100 : 0;
             }
 
             $assignees = collect($pullRequest->assignees);
-            $badAssignees = $assignees->diff($pullRequest->contributors);
+            $badAssignees = $assignees->diff((array) $pullRequest->contributors);
 
             return round($badAssignees->count() / $totalContributors * 100, 2);
         });
@@ -202,13 +206,13 @@ class MakeContributorsReport implements ShouldQueue
     private function getUnexpectedContributors(Collection $actions): Collection
     {
         return $actions->get('pullRequests')->map(function ($pullRequest) {
-            $totalContributors = count($pullRequest->contributors);
+            $totalContributors = count((array) $pullRequest->contributors);
 
             if ($totalContributors <= 0) {
                 return 0;
             }
 
-            $contributors = collect($pullRequest->contributors);
+            $contributors = collect((array) $pullRequest->contributors);
             $unexpectedContributors = $contributors->diff($pullRequest->assignees);
 
             return round($unexpectedContributors->count() / $totalContributors * 100, 2);

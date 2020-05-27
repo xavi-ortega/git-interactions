@@ -24,7 +24,15 @@ class GithubRepositoryActions
                 'pullRequests' => collect(isset($actions->pullRequests) ? $actions->pullRequests : []),
                 'branches' => collect(isset($actions->branches) ? $actions->branches : []),
                 'contributors' => collect(isset($actions->contributors) ? $actions->contributors : []),
-                'commits' => collect(isset($actions->commits) ? $actions->commits : [])
+                'commits' => collect(isset($actions->commits) ? $actions->commits : [])->map(function ($commit) {
+                    $commit->diffs = collect($commit->diffs)->map(function ($diff) {
+                        $diff->patches = collect($diff->patches);
+
+                        return $diff;
+                    });
+
+                    return $commit;
+                })
             ]);
         }
 
