@@ -12,15 +12,21 @@ use App\Repository;
 use Cz\Git\GitException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Illuminate\Http\Request;
+use App\Jobs\MakeCodeReport;
 
+use Illuminate\Http\Request;
 use App\Helpers\GitRepository;
+use App\Jobs\MakeIssuesReport;
+
 use App\Helpers\GithubApiClient;
 use App\Services\GitCommitService;
-
+use Illuminate\Support\Facades\Log;
+use App\Jobs\MakeContributorsReport;
+use App\Jobs\MakePullRequestsReport;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\GithubRepositoryActions;
 use App\Services\GithubRepositoryService;
+use App\Services\GithubContributorService;
 use App\Services\GithubRepositoryIssueService;
 use App\Exceptions\RepositoryNotFoundException;
 use App\Services\GithubRepositoryBranchService;
@@ -28,6 +34,9 @@ use App\Services\GithubRepositoryPullRequestsService;
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
 
 const MAX_ISSUES = 100;
+const IGNORED_FILES = [
+    'package.json', 'package-lock.json'
+];
 
 class RepositoriesController extends Controller
 {
@@ -36,6 +45,7 @@ class RepositoriesController extends Controller
     private $pullRequestService;
     private $branchService;
     private $commitService;
+    private $contributorService;
 
     public function __construct()
     {
@@ -44,6 +54,7 @@ class RepositoriesController extends Controller
         $this->pullRequestService = new GithubRepositoryPullRequestsService();
         $this->branchService = new GithubRepositoryBranchService();
         $this->commitService = new GitCommitService();
+        $this->contributorService = new GithubContributorService();
     }
 
     public function rateLimit()
@@ -55,6 +66,35 @@ class RepositoriesController extends Controller
         );
     }
 
+    public function prepare(Request $request)
+    {
+        $user = User::find(1);
+
+        $request->validate([
+            'name' => 'required',
+            'owner' => 'required'
+        ]);
+
+        $repository = $this->getOrCreateRepository($request->name, $request->owner);
+
+        try {
+            $start = microtime(true);
+
+            $repository = $this->getOrCreateRepository($request->name, $request->owner);
+
+            $report = $this->dispatchReport($user, $repository);
+
+            $time_elapsed_secs = microtime(true) - $start;
+
+            return response()->json([
+                'message' => 'Your report is in progress',
+                'report' => $report
+            ]);
+        } catch (RepositoryNotFoundException $e) {
+            return response()->json(['error' => 'Repository not found'], 404);
+        }
+    }
+
     public function report(Request $request)
     {
         $request->validate([
@@ -64,44 +104,22 @@ class RepositoriesController extends Controller
 
         $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-        try {
-            $repository = $this->getOrCreateRepository($request->name, $request->owner);
-
-            $report = $this->getOrCreateReport($repository);
-
-            return response()->json([
-                'repo' => $repository,
-                'issues' => $report->issues,
-                'pullRequests' => $report->pull_requests,
-                'contributors' => $report->contributors
-            ]);
-        } catch (RepositoryNotFoundException $e) {
-            return response()->json(['error' => 'Repository not found'], 404);
-        }
-
-        $clonePath = storage_path('app/raw/' . $repository->id . '/clone');
-
-        if (!is_dir($clonePath)) {
-            mkdir($clonePath, 0777, true);
-        }
-
-        try {
-            $cloned = GitRepository::cloneRepository($repository->url, $clonePath);
-        } catch (GitException $e) {
-            $cloned = new GitRepository($clonePath);
-        }
-
-        $cloned->checkout('master');
-
-        $cloned->logPatches($repository->name . '.log');
-
-        $path = $clonePath . '/' . $repository->name . '.log';
-
         $start = microtime(true);
-        $commits = $this->commitService->process($path);
+
+        $repository = $this->getOrCreateRepository($request->name, $request->owner);
+
+        $report = $repository->reports()->firstOrFail();
+
         $time_elapsed_secs = microtime(true) - $start;
 
-        return response()->json(['commits' => $commits->pluck('author.email')->unique(), 'time' => $time_elapsed_secs]);
+        return response()->json([
+            'time' => $time_elapsed_secs,
+            'repo' => $repository,
+            'issues' => $report->issues,
+            'pullRequests' => $report->pull_requests,
+            'contributors' => $report->contributors,
+            'code' => $report->code
+        ]);
     }
 
     private function getOrCreateRepository(string $name, string $owner): Repository
@@ -123,35 +141,19 @@ class RepositoriesController extends Controller
         return $repository;
     }
 
-    private function getOrCreateReport(Repository $repository): Report
+    private function dispatchReport(User $user, Repository $repository): Report
     {
-        $user = User::find(1);
+        $repositoryMetrics = $this->repositoryService->getRepositoryMetrics($repository->name, $repository->owner);
 
-        $report = null; //$repository->reports()->first();
+        $report = $user->reports()->create([
+            'repository_id' => $repository->id,
+        ]);
 
-        if ($report === null) {
-            $repositoryActions = new GithubRepositoryActions();
-            $repositoryMetrics = $this->repositoryService->getRepositoryMetrics($repository->name, $repository->owner);
-
-            $issuesReport = $this->makeIssuesReport($repository, $repositoryMetrics->issues->totalCount, $repositoryActions);
-            $pullRequestsReport = $this->makePullRequestsReport($repository, $repositoryMetrics->pullRequests->totalCount, $repositoryActions);
-            $contributorsReport = $this->makeContributorsReport($repository, $repositoryMetrics->branches->totalCount, $repositoryActions);
-
-            $raw = $repositoryActions->get()->toJson();
-
-            Storage::disk('raw')->put($repository->id . '/raw.json', $raw);
-
-            $repository->raw = storage_path("app/raw/{$repository->id}/raw.json");
-            $repository->save();
-
-            $report = $user->reports()->create([
-                'repository_id' => $repository->id,
-            ]);
-
-            $report->issues()->create($issuesReport);
-            $report->pull_requests()->create($pullRequestsReport);
-            $report->contributors()->create($contributorsReport);
-        }
+        MakeIssuesReport::withChain([
+            new MakePullRequestsReport($repository, $report, $repositoryMetrics->pullRequests->totalCount),
+            new MakeContributorsReport($repository, $report),
+            new MakeCodeReport($repository, $report, $repositoryMetrics->branches->totalCount)
+        ])->dispatch($repository, $report, $repositoryMetrics->issues->totalCount);
 
         return $report;
     }
@@ -228,10 +230,12 @@ class RepositoriesController extends Controller
                 } else {
                     $total->commits += $pullRequest->commits;
                 }
-            } else if ($pullRequest->merged) {
-                $total->merged++;
             } else {
                 $total->open++;
+            }
+
+            if ($pullRequest->merged) {
+                $total->merged++;
             }
 
             $intervalToClose = Carbon::make($pullRequest->createdAt)->diff($pullRequest->closedAt);
@@ -286,15 +290,15 @@ class RepositoriesController extends Controller
             'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
             'merged_less_than_one_hour' => $total->mergedInLessThanOneHour,
             'prc_closed_with_commits' => 100 - round($total->closedWithoutCommits / $total->pullRequests * 100, 2),
-            'avg_commits_per_pr' => $repositoryPullRequests->get()->pluck('totalCommits')->median(),
+            'avg_commits_per_pr' => $repositoryPullRequests->get()->pluck('commits')->median(),
             'avg_time_to_close' => $avgTimeToClose->forHumans(),
             'avg_time_to_merge' => $avgTimeToMerge->forHumans()
         ];
     }
 
-    private function makeContributorsReport(Repository $repository, int $totalCount, GithubRepositoryActions $repositoryActions)
+    private function makeContributorsReport(Repository $repository, GithubRepositoryActions $repositoryActions)
     {
-        $repositoryBranches = $this->branchService->getRepositoryBranches($repository->name, $repository->owner, $totalCount);
+        Log::debug('cloning repo');
 
         $clonePath = storage_path('app/raw/' . $repository->id . '/clone');
 
@@ -316,10 +320,21 @@ class RepositoriesController extends Controller
 
         $repositoryCommits = $this->commitService->process($path);
 
-        $repositoryBranches->get()->each([$repositoryActions, 'registerBranch']);
-        $repositoryCommits->each([$repositoryActions, 'registerCommit']);
+        $repositoryCommits->each(function ($commit) use ($repository, $repositoryActions) {
+            if (!$repositoryActions->get('contributors')->has($commit->author->email)) {
+                Log::info('getting contributor: ' . $commit->author->email . ' at ' . $commit->id);
+                $contributor = $this->contributorService->getByCommit($repository->name, $repository->owner, $commit->id);
+                $repositoryActions->registerContributor($contributor);
+            }
+
+            $repositoryActions->registerCommit($commit);
+        });
 
         $actions = $repositoryActions->get();
+
+        $contributorsWithUser = $actions->get('contributors')->filter(function ($contributor) {
+            return (bool) $contributor->user;
+        });
 
         return [
             'total' => $actions->get('contributors')->count(),
@@ -328,32 +343,42 @@ class RepositoriesController extends Controller
             })->median()),
             'avg_lines_per_commit' => floor($actions->get('commits')->map(function ($commit) {
                 return $commit->diffs->map(function ($diff) {
-                    return $diff->patches->map(function ($patch) {
-                        // try {
-                        return abs(
-                            $patch->newStart - $patch->oldStart + $patch->newCount - $patch->oldCount
-                        );
-                        // } catch (Exception $e) {
-                        //     dd($patch);
-                        // }
-                    });
-                });
+                    if ($diff->patches->isNotEmpty()) {
+                        return $diff->patches->map(function ($patch) {
+                            if ($patch->newCount < $patch->oldCount) {
+                                return $patch->oldCount - $patch->newCount;
+                            } else {
+                                return $patch->newCount;
+                            }
+                        })->sum();
+                    } else {
+                        return 0;
+                    }
+                })->sum();
             })->median()),
             'avg_lines_per_file_per_commit' => floor($actions->get('commits')->map(function ($commit) {
-                $totalFiles = $commit->diffs->pluck('newFile')->unique()->count();
-                $totalLines = $commit->diffs->map(function ($diff) {
+                $totalFiles = $commit->diffs->whereNotNull('newFile')->pluck('newFile')->unique()->count();
+
+                if ($totalFiles === 0) {
+
+                    return 0;
+                }
+
+                $totalLines = $commit->diffs->whereNotNull('newFile')->map(function ($diff) {
                     return $diff->patches->map(function ($patch) {
-                        return abs(
-                            $patch->newStart - $patch->oldStart + $patch->newCount - $patch->oldCount
-                        );
-                    });
+                        if ($patch->newCount < $patch->oldCount) {
+                            return $patch->oldCount - $patch->newCount;
+                        } else {
+                            return $patch->newCount;
+                        }
+                    })->sum();
                 })->sum();
 
                 return $totalLines / $totalFiles;
             })->median()),
-            'avg_pull_request_contributed' => floor($actions->get('contributors')->map(function ($contributor) use ($actions) {
+            'avg_pull_request_contributed' => floor($contributorsWithUser->map(function ($contributor) use ($actions) {
                 return $actions->get('pullRequests')->filter(function ($pullRequest) use ($contributor) {
-                    return Arr::has($pullRequest->contributors, $contributor->user->login);
+                    return in_array($contributor->user->login, $pullRequest->contributors);
                 })->count();
             })->median()),
             'avg_prc_good_assignees' => $actions->get('pullRequests')->map(function ($pullRequest) {
@@ -428,6 +453,105 @@ class RepositoriesController extends Controller
 
                 return round($unexpectedReviewers->count() / $totalReviewers * 100, 2);
             })->median()
+        ];
+    }
+
+    private function makeCodeReport(Repository $repository, int $totalCount, GithubRepositoryActions $repositoryActions)
+    {
+        $repositoryBranches = $this->branchService->getRepositoryBranches($repository->name, $repository->owner, $totalCount);
+
+        $repositoryBranches->get()->each([$repositoryActions, 'registerBranch']);
+
+        $actions = $repositoryActions->get();
+
+        $oneMonth = new DateInterval('P1M');
+
+        $files = collect();
+
+        $actions->get('commits')->each(function ($commit) use ($files) {
+            $commit->diffs->each(function ($diff) use ($files, $commit) {
+                $oldFile = $diff->oldFile;
+                $fileName = $diff->newFile;
+
+                if (!Str::contains($fileName, IGNORED_FILES)) {
+                    if ($oldFile !== $fileName) {
+                        // RENAMED FILE
+                        $file = $files->pull($oldFile);
+
+                        if ($file) {
+                            $file->renames->push((object) [
+                                'old' => $oldFile,
+                                'new' => $fileName
+                            ]);
+                        }
+                    } else if ($files->has($fileName)) {
+                        $file = $files->get($fileName);
+                    } else {
+                        $file = (object) [
+                            'name' => $fileName,
+                            'owner' => $commit->author,
+                            'patches' => collect(),
+                            'renames' => collect()
+                        ];
+                    }
+
+                    if ($file) {
+                        $patches = $diff->patches->map(function ($patch) use ($commit) {
+                            $patch->owner = $commit->author;
+                            return $patch;
+                        });
+
+                        $file->patches = $file->patches->merge($patches);
+
+                        $files->put($fileName, $file);
+                    }
+                }
+            });
+        });
+
+        $code = $files->reduce(function ($total, $file) {
+            $fileMap = collect();
+
+            $file->patches->each(function ($patch) use ($total, $fileMap) {
+                $startLine = $patch->newStart;
+                $endLine = $startLine + $patch->newCount;
+                $author = $patch->owner->email;
+
+                for ($line = $startLine; $line < $endLine; $line++) {
+                    $total->lines++;
+
+                    if ($fileMap->has($line)) {
+                        if ($fileMap->get($line) === $author) {
+                            $total->rewriteOwn++;
+                        } else {
+                            $total->rewriteOthers++;
+                        }
+                    } else {
+                        $fileMap->put($line, $author);
+                        $total->new++;
+                    }
+                }
+            });
+
+            return $total;
+        }, (object) [
+            'lines' => 0,
+            'new' => 0,
+            'rewriteOwn' => 0,
+            'rewriteOthers' => 0
+        ]);
+
+        return [
+            'branches' => $actions->get('branches')->count(),
+            'branches_without_activity' => $actions->get('branches')->filter(function ($branch) use ($oneMonth) {
+                return $branch->lastActivity < $oneMonth;
+            })->count(),
+            'prc_new_code' => round($code->new / $code->lines * 100, 2),
+            'prc_rewrite_others_code' => round($code->rewriteOthers / $code->lines * 100, 2),
+            'prc_rewrite_own_code' => round($code->rewriteOwn / $code->lines * 100, 2),
+            'top_changed_files' => $files->sort(function ($a, $b) {
+                return $b->patches->count() - $a->patches->count();
+            })->take(10)
         ];
     }
 }

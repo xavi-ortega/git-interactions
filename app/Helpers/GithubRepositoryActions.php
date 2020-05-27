@@ -4,32 +4,31 @@ namespace App\Helpers;
 
 use Illuminate\Support\Collection;
 
-const ACTION_OPEN = 'open';
-const ACTION_CLOSE = 'close';
-const ACTION_MERGE = 'merge';
-const ACTION_ASSIGN = 'assign';
-const ACTION_SUGGESTED_REVIEWER = 'suggested-reviewer';
-const ACTION_REVIEW = 'review';
-const ACTION_COMMIT_PR = 'commit-pr';
-const ACTION_COMMIT_BRANCH = 'commit-branch';
-
 class GithubRepositoryActions
 {
     private $collection;
 
-    public function __construct(array $actions = [])
+    public function __construct(object $actions = null)
     {
-        if (count($actions) <= 0) {
-            $actions = [
+        if ($actions === null || empty((array) $actions)) {
+            $collection = collect([
                 'issues' => collect(),
                 'pullRequests' => collect(),
                 'branches' => collect(),
                 'contributors' => collect(),
                 'commits' => collect()
-            ];
+            ]);
+        } else {
+            $collection = collect([
+                'issues' => collect(isset($actions->issues) ? $actions->issues : []),
+                'pullRequests' => collect(isset($actions->pullRequests) ? $actions->pullRequests : []),
+                'branches' => collect(isset($actions->branches) ? $actions->branches : []),
+                'contributors' => collect(isset($actions->contributors) ? $actions->contributors : []),
+                'commits' => collect(isset($actions->commits) ? $actions->commits : [])
+            ]);
         }
 
-        $this->collection = collect($actions);
+        $this->collection = $collection;
     }
 
     public function get(string $type = ''): Collection

@@ -13,7 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Helpers\GithubRepositoryActions;
-use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE};
+use App\Services\GithubRepositoryIssueService;
 
 class MakeIssuesReport implements ShouldQueue
 {
@@ -22,6 +22,7 @@ class MakeIssuesReport implements ShouldQueue
     private $repository;
     private $report;
     private $totalIssues;
+    private $issueService;
 
     /**
      * Create a new job instance.
@@ -40,7 +41,7 @@ class MakeIssuesReport implements ShouldQueue
      *
      * @return void
      */
-    public function handle()
+    public function handle(GithubRepositoryIssueService $issueService)
     {
         // RETRIEVE OR CREATE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
@@ -62,11 +63,13 @@ class MakeIssuesReport implements ShouldQueue
         $pointer = collect($rawPointer);
         $repositoryActions = new GithubRepositoryActions($raw);
 
-        $repositoryIssues = $this->issueService->getRepositoryIssues($this->repository->name, $this->repository->owner, $this->totalIssues);
+        $repositoryIssues = $issueService->getRepositoryIssues($this->repository->name, $this->repository->owner, $this->totalIssues);
 
         $oneHour = new DateInterval('PT1H');
 
-        $total = $repositoryIssues->get()->reduce(function ($total, $issue) use ($repositoryActions, $oneHour) {
+        $repositoryIssues->get()->each([$repositoryActions, 'registerIssue']);
+
+        $total = $repositoryActions->get('issues')->reduce(function ($total, $issue) use ($oneHour) {
             $total->issues++;
 
             if ($issue->closed) {
@@ -77,23 +80,12 @@ class MakeIssuesReport implements ShouldQueue
 
             $intervalToClose = Carbon::make($issue->createdAt)->diff($issue->closedAt);
 
-            $issueInfo = (object) [
-                'id' => $issue->id,
-                'timeToClose' => Carbon::make('@0')->add($intervalToClose)->timestamp
-            ];
+            $closeTime = Carbon::make('@0')->add($intervalToClose)->timestamp;
 
-            $total->closeTime->push($issueInfo->timeToClose);
+            $total->closeTime->push($closeTime);
 
             if ($intervalToClose < $oneHour) {
                 $total->closedInLessThanOneHour;
-            }
-
-            if ($issue->author !== null) {
-                $repositoryActions->registerIssueAction($issue->author, ACTION_OPEN, $issueInfo);
-            }
-
-            if ($issue->closedBy !== null) {
-                $repositoryActions->registerIssueAction($issue->closedBy, ACTION_CLOSE, $issueInfo);
             }
 
             return $total;
@@ -124,7 +116,6 @@ class MakeIssuesReport implements ShouldQueue
             'total' => $total->issues,
             'open' => $total->open,
             'closed' => $total->closed,
-            'closed_by_bot' => $total->closedByBot,
             'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
             'avg_time_to_close' => $avgTimeToClose->forHumans()
         ]);

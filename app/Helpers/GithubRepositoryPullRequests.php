@@ -45,7 +45,7 @@ class GithubRepositoryPullRequests
                 return isset($closedEvent->actor) ? $closedEvent->actor->login : null;
             }, $pullRequest->closedEvent->nodes);
 
-            $contributors = collect($pullRequest->commits->nodes)->pluck('commit.author.user.login')->unique()->toArray();
+            $contributors = collect($pullRequest->commits->nodes)->pluck('commit.author.user.login')->unique()->all();
 
             return (object) [
                 'id' => $pullRequest->id,

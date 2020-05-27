@@ -107,7 +107,8 @@ class GitCommitService
 
             return (object) [
                 'oldFile' => (string) $oldFile,
-                'newFile' => (string) $newFile
+                'newFile' => (string) $newFile,
+                'patches' => collect()
             ];
         } else {
             $oldFile = $parser->skipUntilStartsWith('--- ')->getLine()->after('--- ')->trim();
@@ -143,12 +144,14 @@ class GitCommitService
                         // check if fails for more exceptions
                     }
 
+                    $oldCount = !empty($oldCount) ? (string) Str::of($oldCount)->trim(',') : 1;
+                    $newCount = !empty($newCount) ? (string) Str::of($newCount)->trim(',') : 1;
 
                     $patches->push((object) [
-                        'oldStart' => $oldStart || 0,
-                        'oldCount' => (string) Str::of($oldCount)->trim(',') || 0,
-                        'newStart' => $newStart || 0,
-                        'newCount' => (string) Str::of($newCount)->trim(',') || 0
+                        'oldStart' => $oldStart,
+                        'oldCount' => $oldCount,
+                        'newStart' => $newStart,
+                        'newCount' => $newCount
                     ]);
                 } catch (Exception $e) {
                     dd($line, $matches);
@@ -162,8 +165,8 @@ class GitCommitService
 
 
             return (object) [
-                'oldFile' => $oldFile->contains('/dev/null') ? "created: {$newFile->substr(2)}" : (string) $oldFile->substr(2),
-                'newFile' => $newFile->contains('/dev/null') ? "removed: {$oldFile->substr(2)}" : (string) $newFile->substr(2),
+                'oldFile' => $oldFile->contains('/dev/null') ? (string) $newFile->substr(2) : (string) $oldFile->substr(2),
+                'newFile' => $newFile->contains('/dev/null') ? (string) $oldFile->substr(2) : (string) $newFile->substr(2),
                 'patches' => $patches
             ];
         }

@@ -573,11 +573,13 @@ class GithubApiClient
     public function getRepositoryCommitById(array $params): object
     {
         $query = <<<QUERY
-        query (\$owner: String!, \$name: String!, \$oid: String!){
+        query (\$owner: String!, \$name: String!, \$oid: GitObjectID!){
             repository(owner: \$owner, name: \$name) {
                 commit: object(oid: \$oid) {
                     ... on Commit {
                         author {
+                            name,
+                            email,
                             user {
                                 email,
                                 login

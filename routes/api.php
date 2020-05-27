@@ -20,3 +20,4 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 
 Route::get('rate-limit', 'RepositoriesController@rateLimit');
 Route::get('repository/report', 'RepositoriesController@report');
+Route::get('repository/dispatch', 'RepositoriesController@prepare');

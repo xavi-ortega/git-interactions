@@ -2,16 +2,23 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Report;
 use Carbon\Carbon;
 use App\Repository;
+use Cz\Git\GitException;
 use Illuminate\Bus\Queueable;
+use App\Helpers\GitRepository;
+use App\Services\GitCommitService;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use App\Helpers\GithubRepositoryActions;
 use Illuminate\Queue\InteractsWithQueue;
+use App\Services\GithubContributorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryActions;
 
 class MakeContributorsReport implements ShouldQueue
 {
@@ -19,18 +26,16 @@ class MakeContributorsReport implements ShouldQueue
 
     private $repository;
     private $report;
-    private $totalBranches;
 
     /**
      * Create a new job instance.
      *
      * @return void
      */
-    public function __construct(Repository $repository, Report $report, string $totalBranches)
+    public function __construct(Repository $repository, Report $report)
     {
         $this->repository = $repository;
         $this->report = $report;
-        $this->totalBranches = $totalBranches;
     }
 
     /**
@@ -38,134 +43,223 @@ class MakeContributorsReport implements ShouldQueue
      *
      * @return void
      */
-    public function handle()
+    public function handle(GitCommitService $commitService, GithubContributorService $contributorService)
     {
         // RETRIEVE BACKUP
-        $pointerPath = "{$this->repository->id}/pointer.json";
         $rawPath = "{$this->repository->id}/raw.json";
 
-        $rawPointer = json_decode(Storage::disk('raw')->get($pointerPath));
         $raw = json_decode(Storage::disk('raw')->get($rawPath));
 
-        $pointer = collect($rawPointer);
         $repositoryActions = new GithubRepositoryActions($raw);
 
-        $repositoryBranches = $this->branchService->getRepositoryBranches($this->repository->name, $this->repository->owner, $this->totalBranches);
+        $clonePath = storage_path('app/raw/' . $this->repository->id . '/clone');
 
-        // NEW COMMITS PARSER
+        if (!is_dir($clonePath)) {
+            mkdir($clonePath, 0777, true);
+        }
 
-        $contributors = $repositoryActions->get()->flatten(1)->reduce(function ($contributors, $contributor) {
-            return (object) [
-                'issues' => $contributors->issues->merge($contributor->issues),
-                'pullRequests' => $contributors->pullRequests->merge($contributor->pullRequests),
-                'commits' => $contributors->commits->merge($contributor->commits)
-            ];
-        }, (object) [
-            'issues' => collect(),
-            'pullRequests' => collect(),
-            'commits' => collect()
-        ]);
+        try {
+            $cloned = GitRepository::cloneRepository($this->repository->url, $clonePath);
+        } catch (GitException $e) {
+            $cloned = new GitRepository($clonePath);
+        }
 
-        $pullRequests = $contributors->pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-            $pullRequest->contributorsCollection = $repositoryActions->getContributorsCommitedTo($pullRequest->id);
-            $pullRequest->reviewersCollection = $repositoryActions->getContributorsReviewedTo($pullRequest->id);
+        $cloned->checkout('master');
 
-            return $pullRequest;
+        $cloned->logPatches($this->repository->name . '.log');
+
+        $path = $clonePath . '/' . $this->repository->name . '.log';
+
+        $repositoryCommits = $commitService->process($path);
+
+        $repositoryCommits->each(function ($commit) use ($contributorService, $repositoryActions) {
+            if (!$repositoryActions->get('contributors')->has($commit->author->email)) {
+                Log::info('fetching contributor: ' . $commit->author->email . ' at ' . $commit->id);
+                $contributor = $contributorService->getByCommit($this->repository->name, $this->repository->owner, $commit->id);
+                $repositoryActions->registerContributor($contributor);
+            }
+
+            $repositoryActions->registerCommit($commit);
         });
 
-        $avgTimeToPush = Carbon::createFromTimestamp(
-            floor($contributors->commits->pluck('timeToPush')->filter(function ($timeToPush) {
-                return $timeToPush !== null;
-            })->median())
-        )->diffAsCarbonInterval(
-            Carbon::createFromTimestamp(0)
-        );
+        $actions = $repositoryActions->get();
 
-        $this->report->issues()->create([
-            'total' => $repositoryActions->get()->count(),
-            'avg_files_per_commit' => floor($contributors->commits->pluck('changedFiles')->median()),
-            'avg_lines_per_commit' => floor($contributors->commits->pluck('changedLines')->median()),
-            'avg_lines_per_file_per_commit' => floor($contributors->commits->pluck('linesPerFile')->median()),
-            'avg_pull_request_contributed' => $repositoryActions->get()->map(function ($contributor) {
-                return $contributor->pullRequests->count();
-            })->median(),
-            'avg_prc_good_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-                $contributors = $pullRequest->contributorsCollection;
-                $good_assignees = $contributors->intersect($repositoryActions->getContributorsAssignedTo($pullRequest->id));
+        $contributorsWithUser = $actions->get('contributors')->filter(function ($contributor) {
+            return (bool) $contributor->user;
+        });
 
-                $totalContributors = $contributors->count();
-
-                if ($totalContributors <= 0) {
-                    return 0;
-                }
-
-                return round($good_assignees->count() / $totalContributors * 100, 2);
-            })->median(),
-            'avg_prc_bad_assignees' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-                $contributors = $pullRequest->contributorsCollection;
-                $bad_assignees = $repositoryActions->getContributorsAssignedTo($pullRequest->id)->diff($contributors);
-
-                $totalContributors = $contributors->count();
-
-                if ($totalContributors <= 0) {
-                    return $bad_assignees->count() > 0 ? 100 : 0;
-                }
-
-                return round($bad_assignees->count() / $totalContributors * 100, 2);
-            })->median(),
-            'avg_prc_unexpected_contributors' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-                $contributors = $pullRequest->contributorsCollection;
-                $unexpected_contributors = $contributors->diff($repositoryActions->getContributorsAssignedTo($pullRequest->id));
-
-                $totalContributors = $contributors->count();
-
-                if ($totalContributors <= 0) {
-                    return 0;
-                }
-
-                return round($unexpected_contributors->count() / $totalContributors * 100, 2);
-            })->median(),
-            'avg_prc_good_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-                $reviewers = $pullRequest->reviewersCollection;
-                $good_reviewers = $reviewers->intersect($repositoryActions->getContributorsSuggestedForReviewTo($pullRequest->id));
-
-                $totalReviewers = $reviewers->count();
-
-                if ($totalReviewers <= 0) {
-                    return 0;
-                }
-
-                return round($good_reviewers->count() / $totalReviewers * 100, 2);
-            })->median(),
-            'avg_prc_bad_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-                $reviewers = $pullRequest->reviewersCollection;
-                $bad_reviewers = $repositoryActions->getContributorsSuggestedForReviewTo($pullRequest->id)->diff($reviewers);
-
-                $totalReviewers = $reviewers->count();
-
-                if ($totalReviewers <= 0) {
-                    return $bad_reviewers->count() > 0 ? 100 : 0;
-                }
-
-                return round($bad_reviewers->count() / $totalReviewers * 100, 2);
-            })->median(),
-            'avg_prc_unexpected_reviewers' => $pullRequests->map(function ($pullRequest) use ($repositoryActions) {
-                $reviewers = $pullRequest->reviewersCollection;
-                $unexpected_reviewers = $reviewers->diff($repositoryActions->getContributorsSuggestedForReviewTo($pullRequest->id));
-
-                $totalReviewers = $reviewers->count();
-
-                if ($totalReviewers <= 0) {
-                    return 0;
-                }
-
-                return round($unexpected_reviewers->count() / $totalReviewers * 100, 2);
-            })->median()
+        $this->report->contributors()->create([
+            'total' => $actions->get('contributors')->count(),
+            'avg_files_per_commit' => floor($this->getFilesPerCommit($actions)->median()),
+            'avg_lines_per_commit' => floor($this->getLinesPerCommit($actions)->median()),
+            'avg_lines_per_file_per_commit' => floor($this->getLinesPerFilePerCommit($actions)->median()),
+            'avg_pull_request_contributed' => floor($this->getPullRequestsContributed($contributorsWithUser, $actions)->median()),
+            'avg_prc_good_assignees' => $this->getGoodAssignees($actions)->median(),
+            'avg_prc_bad_assignees' => $this->getBadAssignees($actions)->median(),
+            'avg_prc_unexpected_contributors' => $this->getUnexpectedContributors($actions)->median(),
+            'avg_prc_good_reviewers' => $this->getGoodReviewers($actions)->median(),
+            'avg_prc_bad_reviewers' => $this->getBadReviewers($actions)->median(),
+            'avg_prc_unexpected_reviewers' => $this->getUnexpectedContributors($actions)->median()
         ]);
+    }
 
-        // SET BACKUP PATHS
-        $this->repository->pointer = storage_path("app/raw/{$pointerPath}");
-        $this->repository->raw = storage_path("app/raw/{$rawPath}");
-        $this->repository->save();
+    private function getFilesPerCommit(Collection $actions): Collection
+    {
+        return $actions->get('commits')->map(function ($commit) {
+            return $commit->diffs->pluck('newFile')->unique()->count();
+        });
+    }
+
+    private function getLinesPerCommit(Collection $actions): Collection
+    {
+        return $actions->get('commits')->map(function ($commit) {
+            return $commit->diffs->map(function ($diff) {
+                if ($diff->patches->isNotEmpty()) {
+                    return $diff->patches->map(function ($patch) {
+                        if ($patch->newCount < $patch->oldCount) {
+                            return $patch->oldCount - $patch->newCount;
+                        } else {
+                            return $patch->newCount;
+                        }
+                    })->sum();
+                } else {
+                    return 0;
+                }
+            })->sum();
+        });
+    }
+
+    private function getLinesPerFilePerCommit(Collection $actions): Collection
+    {
+        return $actions->get('commits')->map(function ($commit) {
+            $totalFiles = $commit->diffs->whereNotNull('newFile')->pluck('newFile')->unique()->count();
+
+            if ($totalFiles === 0) {
+
+                return 0;
+            }
+
+            $totalLines = $commit->diffs->whereNotNull('newFile')->map(function ($diff) {
+                return $diff->patches->map(function ($patch) {
+                    if ($patch->newCount < $patch->oldCount) {
+                        return $patch->oldCount - $patch->newCount;
+                    } else {
+                        return $patch->newCount;
+                    }
+                })->sum();
+            })->sum();
+
+            return $totalLines / $totalFiles;
+        });
+    }
+
+    private function getPullRequestsContributed(Collection $contributorsWithUser, Collection $actions): Collection
+    {
+        return $contributorsWithUser->map(function ($contributor) use ($actions) {
+            return $actions->get('pullRequests')->filter(function ($pullRequest) use ($contributor) {
+                try {
+                    return in_array($contributor->user->login, $pullRequest->contributors);
+                } catch (Exception $e) {
+                    dd($pullRequest);
+                }
+            })->count();
+        });
+    }
+
+    private function getGoodAssignees(Collection $actions): Collection
+    {
+        dd($actions);
+        return $actions->get('pullRequests')->map(function ($pullRequest) {
+            $totalContributors = count($pullRequest->contributors);
+
+            if ($totalContributors <= 0) {
+                return 0;
+            }
+
+            $contributors = collect($pullRequest->contributors);
+            $goodAssignees = $contributors->intersect($pullRequest->assignees);
+
+            return round($goodAssignees->count() / $totalContributors * 100, 2);
+        });
+    }
+
+    private function getBadAssignees(Collection $actions): Collection
+    {
+        return $actions->get('pullRequests')->map(function ($pullRequest) {
+            $totalContributors = count($pullRequest->contributors);
+
+            if ($totalContributors <= 0) {
+                return count($pullRequest->assignees) > 0 ? 100 : 0;
+            }
+
+            $assignees = collect($pullRequest->assignees);
+            $badAssignees = $assignees->diff($pullRequest->contributors);
+
+            return round($badAssignees->count() / $totalContributors * 100, 2);
+        });
+    }
+
+    private function getUnexpectedContributors(Collection $actions): Collection
+    {
+        return $actions->get('pullRequests')->map(function ($pullRequest) {
+            $totalContributors = count($pullRequest->contributors);
+
+            if ($totalContributors <= 0) {
+                return 0;
+            }
+
+            $contributors = collect($pullRequest->contributors);
+            $unexpectedContributors = $contributors->diff($pullRequest->assignees);
+
+            return round($unexpectedContributors->count() / $totalContributors * 100, 2);
+        });
+    }
+
+    private function getGoodReviewers(Collection $actions): Collection
+    {
+        return $actions->get('pullRequests')->map(function ($pullRequest) {
+            $totalReviewers = count($pullRequest->reviewers);
+
+            if ($totalReviewers <= 0) {
+                return 0;
+            }
+
+            $reviewers = collect($pullRequest->reviewers);
+            $goodReviewers = $reviewers->intersect($pullRequest->suggestedReviewers);
+
+            return round($goodReviewers->count() / $totalReviewers * 100, 2);
+        });
+    }
+
+    private function getBadReviewers(Collection $actions): Collection
+    {
+        return $actions->get('pullRequests')->map(function ($pullRequest) {
+            $totalReviewers = count($pullRequest->reviewers);
+
+            if ($totalReviewers <= 0) {
+                return count($pullRequest->suggestedReviewers) > 0 ? 100 : 0;
+            }
+
+            $suggestedReviewers = collect($pullRequest->suggestedReviewers);
+            $badReviewers = $suggestedReviewers->diff($pullRequest->reviewers);
+
+            return round($badReviewers->count() / $totalReviewers * 100, 2);
+        });
+    }
+
+    private function getUnexpectedReviewers(Collection $actions): Collection
+    {
+        return $actions->get('pullRequests')->map(function ($pullRequest) {
+            $totalReviewers = count($pullRequest->reviewers);
+
+            if ($totalReviewers <= 0) {
+                return 0;
+            }
+
+            $reviewers = collect($pullRequest->reviewers);
+            $unexpectedReviewers = $reviewers->diff($pullRequest->suggestedReviewers);
+
+            return round($unexpectedReviewers->count() / $totalReviewers * 100, 2);
+        });
     }
 }

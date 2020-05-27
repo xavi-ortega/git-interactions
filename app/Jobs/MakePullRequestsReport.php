@@ -13,8 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Helpers\GithubRepositoryActions;
-
-use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
+use App\Services\GithubRepositoryPullRequestsService;
 
 class MakePullRequestsReport implements ShouldQueue
 {
@@ -34,6 +33,7 @@ class MakePullRequestsReport implements ShouldQueue
         $this->repository = $repository;
         $this->report = $report;
         $this->totalPullRequests = $totalPullRequests;
+        $this->pullRequestService = new GithubRepositoryPullRequestsService();
     }
 
     /**
@@ -41,7 +41,7 @@ class MakePullRequestsReport implements ShouldQueue
      *
      * @return void
      */
-    public function handle()
+    public function handle(GithubRepositoryPullRequestsService $pullRequestService)
     {
         // RETRIEVE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
@@ -53,38 +53,39 @@ class MakePullRequestsReport implements ShouldQueue
         $pointer = collect($rawPointer);
         $repositoryActions = new GithubRepositoryActions($raw);
 
-        $repositoryPullRequests = $this->pullRequestService->getRepositoryPullRequests($this->repository->name, $this->repository->owner, $this->totalPullRequests);
+        $repositoryPullRequests = $pullRequestService->getRepositoryPullRequests($this->repository->name, $this->repository->owner, $this->totalPullRequests);
 
         $oneHour = new DateInterval('PT1H');
 
-        $total = $repositoryPullRequests->get()->reduce(function ($total, $pullRequest) use ($repositoryActions, $oneHour) {
+        $repositoryPullRequests->get()->each([$repositoryActions, 'registerPullRequest']);
+
+        $total = $repositoryActions->get('pullRequests')->reduce(function ($total, $pullRequest) use ($oneHour) {
             $total->pullRequests++;
 
             if ($pullRequest->closed) {
                 $total->closed++;
 
-                if ($pullRequest->totalCommits <= 0) {
+                if ($pullRequest->commits <= 0) {
                     $total->closedWithoutCommits++;
                 } else {
-                    $total->commits += $pullRequest->totalCommits;
+                    $total->commits += $pullRequest->commits;
                 }
-            } else if ($pullRequest->merged) {
-                $total->merged++;
             } else {
                 $total->open++;
+            }
+
+            if ($pullRequest->merged) {
+                $total->merged++;
             }
 
             $intervalToClose = Carbon::make($pullRequest->createdAt)->diff($pullRequest->closedAt);
             $intervalToMerge = Carbon::make($pullRequest->createdAt)->diff($pullRequest->mergedAt);
 
-            $pullRequestInfo = (object) [
-                'id' => $pullRequest->id,
-                'timeToClose' => Carbon::make('@0')->add($intervalToClose)->timestamp,
-                'timeToMerge' => Carbon::make('@0')->add($intervalToMerge)->timestamp,
-            ];
+            $closeTime = Carbon::make('@0')->add($intervalToClose)->timestamp;
+            $mergeTime = Carbon::make('@0')->add($intervalToMerge)->timestamp;
 
-            $total->closeTime->push($pullRequestInfo->timeToClose);
-            $total->mergeTime->push($pullRequestInfo->timeToMerge);
+            $total->closeTime->push($closeTime);
+            $total->mergeTime->push($mergeTime);
 
             if ($intervalToClose < $oneHour) {
                 $total->closedInLessThanOneHour++;
@@ -92,30 +93,6 @@ class MakePullRequestsReport implements ShouldQueue
 
             if ($intervalToMerge < $oneHour) {
                 $total->mergedInLessThanOneHour++;
-            }
-
-            if ($pullRequest->author !== null) {
-                $repositoryActions->registerPullRequestAction($pullRequest->author, ACTION_OPEN, $pullRequestInfo);
-            }
-
-            if ($pullRequest->closedBy !== null) {
-                $repositoryActions->registerPullRequestAction($pullRequest->closedBy, ACTION_CLOSE, $pullRequestInfo);
-            }
-
-            if ($pullRequest->mergedBy !== null) {
-                $repositoryActions->registerPullRequestAction($pullRequest->mergedBy, ACTION_MERGE, $pullRequestInfo);
-            }
-
-            foreach ($pullRequest->assignees as $assignee) {
-                $repositoryActions->registerPullRequestAction($assignee, ACTION_ASSIGN, $pullRequestInfo);
-            }
-
-            foreach ($pullRequest->suggestedReviewers as $suggestedReviewer) {
-                $repositoryActions->registerPullRequestAction($suggestedReviewer, ACTION_SUGGESTED_REVIEWER, $pullRequestInfo);
-            }
-
-            foreach ($pullRequest->reviewers as $reviewer) {
-                $repositoryActions->registerPullRequestAction($reviewer, ACTION_REVIEW, $pullRequestInfo);
             }
 
             return $total;
@@ -153,13 +130,13 @@ class MakePullRequestsReport implements ShouldQueue
             'closed_less_than_one_hour' => $total->closedInLessThanOneHour,
             'merged_less_than_one_hour' => $total->mergedInLessThanOneHour,
             'prc_closed_with_commits' => 100 - round($total->closedWithoutCommits / $total->pullRequests * 100, 2),
-            'avg_commits_per_pr' => $repositoryPullRequests->get()->pluck('totalCommits')->median(),
+            'avg_commits_per_pr' => $repositoryPullRequests->get()->pluck('commits')->median(),
             'avg_time_to_close' => $avgTimeToClose->forHumans(),
             'avg_time_to_merge' => $avgTimeToMerge->forHumans()
         ]);
 
         // UPDATE BACKUP
-        $pointer->put('issue', $repositoryPullRequests->getEndCursor());
+        $pointer->put('pullRequest', $repositoryPullRequests->getEndCursor());
 
         $rawPointer = $pointer->toJSon();
         $raw = $repositoryActions->get()->toJson();

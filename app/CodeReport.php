@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Casts\CollectionCast;
 use Illuminate\Database\Eloquent\Model;
 
 class CodeReport extends Model
@@ -9,6 +10,6 @@ class CodeReport extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'files' => 'array'
+        'top_changed_files' => CollectionCast::class
     ];
 }
