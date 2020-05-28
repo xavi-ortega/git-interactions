@@ -50,13 +50,13 @@ class MakeIssuesReport implements ShouldQueue
         if (Storage::disk('raw')->exists($pointerPath)) {
             $rawPointer = json_decode(Storage::disk('raw')->get($pointerPath));
         } else {
-            $rawPointer = [];
+            $rawPointer = (object) [];
         }
 
         if (Storage::disk('raw')->exists($pointerPath)) {
             $raw = json_decode(Storage::disk('raw')->get($rawPath));
         } else {
-            $raw = [];
+            $raw = (object) [];
         }
 
 

@@ -29,6 +29,8 @@ use App\Services\GithubRepositoryService;
 use App\Services\GithubContributorService;
 use App\Services\GithubRepositoryIssueService;
 use App\Exceptions\RepositoryNotFoundException;
+use App\Notifications\ReportEnded;
+use App\Notifications\ReportStarted;
 use App\Services\GithubRepositoryBranchService;
 use App\Services\GithubRepositoryPullRequestsService;
 use const App\Helpers\{ACTION_OPEN, ACTION_CLOSE, ACTION_MERGE, ACTION_ASSIGN, ACTION_COMMIT_BRANCH, ACTION_COMMIT_PR, ACTION_SUGGESTED_REVIEWER, ACTION_REVIEW};
@@ -38,7 +40,7 @@ const IGNORED_FILES = [
     'package.json', 'package-lock.json'
 ];
 
-class RepositoriesController extends Controller
+class ReportsController extends Controller
 {
     private $repositoryService;
     private $issueService;
@@ -75,16 +77,12 @@ class RepositoriesController extends Controller
             'owner' => 'required'
         ]);
 
-        $repository = $this->getOrCreateRepository($request->name, $request->owner);
-
         try {
-            $start = microtime(true);
-
             $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
             $report = $this->dispatchReport($user, $repository);
 
-            $time_elapsed_secs = microtime(true) - $start;
+            $user->notify(new ReportStarted($report));
 
             return response()->json([
                 'message' => 'Your report is in progress',
@@ -101,8 +99,6 @@ class RepositoriesController extends Controller
             'name' => 'required',
             'owner' => 'required'
         ]);
-
-        $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
         $start = microtime(true);
 
@@ -131,7 +127,7 @@ class RepositoriesController extends Controller
 
             $repository = Repository::create([
                 'name' => $repositoryInfo->name,
-                'slug' => Str::slug($repositoryInfo->name),
+                'slug' => "{$repositoryInfo->owner->login}/{$repositoryInfo->name}",
                 'url' => $repositoryInfo->url,
                 'description' => $repositoryInfo->description,
                 'owner' => $repositoryInfo->owner->login
@@ -152,7 +148,10 @@ class RepositoriesController extends Controller
         MakeIssuesReport::withChain([
             new MakePullRequestsReport($repository, $report, $repositoryMetrics->pullRequests->totalCount),
             new MakeContributorsReport($repository, $report),
-            new MakeCodeReport($repository, $report, $repositoryMetrics->branches->totalCount)
+            new MakeCodeReport($repository, $report, $repositoryMetrics->branches->totalCount),
+            function () use ($user, $report) {
+                $user->notify(new ReportEnded($report));
+            }
         ])->dispatch($repository, $report, $repositoryMetrics->issues->totalCount);
 
         return $report;
