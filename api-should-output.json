@@ -37,7 +37,6 @@
     "contributors": {
         "total": 15,
         "avg_pull_request_contributed": 37,
-        "avg_time_to_push": "11:00",
 
         "avg_files_per_commit": 7,
         "avg_lines_per_commit": 221,

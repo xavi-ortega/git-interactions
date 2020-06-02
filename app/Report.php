@@ -38,4 +38,9 @@ class Report extends Model
     {
         return $this->hasOne(CodeReport::class);
     }
+
+    public function progress()
+    {
+        return $this->hasOne(ReportProgress::class);
+    }
 }

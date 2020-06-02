@@ -15,6 +15,7 @@ class CreateReportsProgressTable extends Migration
     {
         Schema::create('reports_progress', function (Blueprint $table) {
             $table->foreignId('report_id')->constrained()->onDelete('cascade');
+            $table->tinyInteger('type');
             $table->tinyInteger('progress')->default(0);
         });
     }

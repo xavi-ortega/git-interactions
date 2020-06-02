@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Helpers\Constants\ReportProgressType;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
@@ -43,6 +44,14 @@ class MakeIssuesReport implements ShouldQueue
      */
     public function handle(GithubRepositoryIssueService $issueService)
     {
+        // START PROGRESS
+        $progress = $this->report->progress();
+
+        $progress->update([
+            'type' => ReportProgressType::FETCHING_ISSUES,
+            'progress' => 0
+        ]);
+
         // RETRIEVE OR CREATE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
         $rawPath = "{$this->repository->id}/raw.json";
@@ -124,5 +133,10 @@ class MakeIssuesReport implements ShouldQueue
         $this->repository->pointer = storage_path("app/raw/{$pointerPath}");
         $this->repository->raw = storage_path("app/raw/{$rawPath}");
         $this->repository->save();
+
+        // END PROGRESS
+        $progress->update([
+            'progress' => 100
+        ]);
     }
 }

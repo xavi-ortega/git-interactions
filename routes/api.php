@@ -19,6 +19,7 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 });
 
 Route::get('rate-limit', 'ReportsController@rateLimit');
-Route::get('repository/report', 'ReportsController@report');
-Route::get('repository/dispatch', 'ReportsController@prepare');
-Route::get('notifications', 'UsersController@notifications');
+Route::get('report', 'ReportsController@report');
+Route::get('report/dispatch', 'ReportsController@prepare');
+Route::get('report/progress', 'ReportsController@progress');
+Route::get('user/notifications', 'UsersController@notifications');

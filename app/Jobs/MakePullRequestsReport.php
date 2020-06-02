@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Helpers\Constants\ReportProgressType;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
@@ -43,6 +44,14 @@ class MakePullRequestsReport implements ShouldQueue
      */
     public function handle(GithubRepositoryPullRequestsService $pullRequestService)
     {
+        // START PROGRESS
+        $progress = $this->report->progress();
+
+        $progress->update([
+            'type' => ReportProgressType::FETCHING_PULL_REQUESTS,
+            'progress' => 0
+        ]);
+
         // RETRIEVE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
         $rawPath = "{$this->repository->id}/raw.json";
@@ -143,5 +152,10 @@ class MakePullRequestsReport implements ShouldQueue
 
         Storage::disk('raw')->put($pointerPath, $rawPointer);
         Storage::disk('raw')->put($rawPath, $raw);
+
+        // END PROGRESS
+        $progress->update([
+            'progress' => 100
+        ]);
     }
 }

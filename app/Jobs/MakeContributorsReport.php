@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Helpers\Constants\ReportProgressType;
 use Exception;
 use App\Report;
 use Carbon\Carbon;
@@ -45,6 +46,14 @@ class MakeContributorsReport implements ShouldQueue
      */
     public function handle(GitCommitService $commitService, GithubContributorService $contributorService)
     {
+        // START PROGRESS
+        $progress = $this->report->progress();
+
+        $progress->update([
+            'type' => ReportProgressType::FETCHING_CONTRIBUTORS,
+            'progress' => 0
+        ]);
+
         // RETRIEVE BACKUP
         $rawPath = "{$this->repository->id}/raw.json";
 
@@ -106,6 +115,11 @@ class MakeContributorsReport implements ShouldQueue
         $raw = $repositoryActions->get()->toJson();
 
         Storage::disk('raw')->put($rawPath, $raw);
+
+        // END PROGRESS
+        $progress->update([
+            'progress' => 100
+        ]);
     }
 
     private function getFilesPerCommit(Collection $actions): Collection
