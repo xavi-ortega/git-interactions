@@ -25,8 +25,8 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
-        $reports = $user->reports()->with('repository');
 
-        return view('home')->with(compact('reports'));
+
+        return view('home');
     }
 }

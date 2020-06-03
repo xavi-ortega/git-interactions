@@ -105,6 +105,13 @@ class ReportsController extends Controller
         return response()->json($report->progress);
     }
 
+    public function lastUserReports(Request $request)
+    {
+        $user = $request->user();
+
+        return response()->json($user->reports()->with('repository')->get());
+    }
+
     private function getOrCreateRepository(string $name, string $owner): Repository
     {
         $repository = Repository::where('name', $name)->where('owner', $owner)->first();

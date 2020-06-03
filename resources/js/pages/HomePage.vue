@@ -3,6 +3,10 @@
         <div class="col-md-6">
             <shell title="My searches">
                 <router-link to="/report">Report</router-link>
+
+                <ul v-for="report in lastUserReports" :key="report.id">
+                    <li>{{ report.repository.slug }}</li>
+                </ul>
             </shell>
         </div>
 
@@ -12,10 +16,22 @@
     </div>
 </template>
 
-<script lang="ts">
+<script>
 export default {
     data: function() {
-        return {};
+        return {
+            lastUserReports: []
+        };
+    },
+    mounted() {
+        axios
+            .get("/user/lastReports")
+            .then(reports => {
+                this.lastUserReports = reports;
+            })
+            .catch(err => {
+                console.log(err);
+            });
     }
 };
 </script>

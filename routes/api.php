@@ -14,8 +14,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:api')->get('/user', function (Request $request) {
-    return $request->user();
+Route::post('login', 'UsersController@login');
+
+Route::group(['middleware' => 'auth:sanctum'], function () {
+    Route::get('user/lastReports', 'ReportsController@lastUserReports');
 });
 
 Route::get('rate-limit', 'ReportsController@rateLimit');

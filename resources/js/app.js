@@ -8,9 +8,9 @@ require("./bootstrap");
 
 window.Vue = require("vue");
 
-import { routes } from "./routes";
-import VueRouter from "vue-router";
-import NProgress from "nprogress";
+import router from "./router";
+import store from "./core";
+import { mapGetters } from "vuex";
 
 /**
  * The following block of code may be used to automatically register your
@@ -31,24 +31,6 @@ files.keys().map(key =>
     )
 );
 
-Vue.use(VueRouter);
-
-const router = new VueRouter({
-    mode: "history",
-    routes
-});
-
-NProgress.start();
-
-router.beforeResolve((to, from, next) => {
-    if (to.name) {
-        NProgress.start();
-    }
-    next();
-});
-
-router.afterEach(() => NProgress.done());
-
 /**
  * Next, we will create a fresh Vue application instance and attach it to
  * the page. Then, you may begin adding components to this application
@@ -57,5 +39,32 @@ router.afterEach(() => NProgress.done());
 
 const app = new Vue({
     el: "#app",
-    router
+    router,
+    store,
+    created() {
+        const userInfo = localStorage.getItem("user");
+        if (userInfo) {
+            const userData = JSON.parse(userInfo);
+            this.$store.commit("setUserData", userData);
+        }
+
+        axios.interceptors.response.use(
+            response => response,
+            error => {
+                if (error.response.status === 401) {
+                    this.$store.dispatch("logout");
+                }
+                return Promise.reject(error);
+            }
+        );
+    },
+    computed: {
+        ...mapGetters(["isLogged"])
+    },
+
+    methods: {
+        logout() {
+            this.$store.dispatch("logout");
+        }
+    }
 });
