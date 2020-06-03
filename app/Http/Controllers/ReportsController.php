@@ -40,7 +40,7 @@ class ReportsController extends Controller
 
     public function prepare(Request $request)
     {
-        $user = User::find(1);
+        $user = $request->user();
 
         $request->validate([
             'name' => 'required',

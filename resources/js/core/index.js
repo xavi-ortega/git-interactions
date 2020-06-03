@@ -2,41 +2,38 @@ import Vue from "vue";
 import Vuex from "vuex";
 import axios from "axios";
 
+import auth from "./auth";
+import authMutations from "./auth/mutations";
+import authActions from "./auth/actions";
+import authGetters from "./auth/getters";
+
+import report from "./report";
+import reportMutations from "./report/mutations";
+import reportActions from "./report/actions";
+import reportGetters from "./report/getters";
+
 Vue.use(Vuex);
 
 axios.defaults.baseURL = "http://localhost:8000/api";
 
 export default new Vuex.Store({
     state: {
-        user: null
+        ...auth,
+        ...report
     },
 
     mutations: {
-        setUserData(state, userData) {
-            state.user = userData;
-            localStorage.setItem("user", JSON.stringify(userData));
-            axios.defaults.headers.common.Authorization = `Bearer ${userData.token}`;
-        },
-
-        clearUserData() {
-            localStorage.removeItem("user");
-            location.reload();
-        }
+        ...authMutations,
+        ...reportMutations
     },
 
     actions: {
-        login({ commit }, credentials) {
-            return axios.post("/login", credentials).then(({ data }) => {
-                commit("setUserData", data);
-            });
-        },
-
-        logout({ commit }) {
-            commit("clearUserData");
-        }
+        ...authActions,
+        ...reportActions
     },
 
     getters: {
-        isLogged: state => !!state.user
+        ...authGetters,
+        ...reportGetters
     }
 });

@@ -18,10 +18,12 @@ Route::post('login', 'UsersController@login');
 
 Route::group(['middleware' => 'auth:sanctum'], function () {
     Route::get('user/lastReports', 'ReportsController@lastUserReports');
+
+    Route::get('report', 'ReportsController@report');
+    Route::get('report/dispatch', 'ReportsController@prepare');
+    Route::get('report/progress', 'ReportsController@progress');
 });
 
 Route::get('rate-limit', 'ReportsController@rateLimit');
-Route::get('report', 'ReportsController@report');
-Route::get('report/dispatch', 'ReportsController@prepare');
-Route::get('report/progress', 'ReportsController@progress');
+
 Route::get('user/notifications', 'UsersController@notifications');

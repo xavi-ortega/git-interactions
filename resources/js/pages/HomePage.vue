@@ -3,10 +3,18 @@
         <div class="col-md-6">
             <shell title="My searches">
                 <router-link to="/report">Report</router-link>
+                <template v-if="isLogged">
+                    <ul v-for="report in lastUserReports" :key="report.id">
+                        <li>{{ report.repository.slug }}</li>
+                    </ul>
+                </template>
 
-                <ul v-for="report in lastUserReports" :key="report.id">
-                    <li>{{ report.repository.slug }}</li>
-                </ul>
+                <div class="alert alert-warning" v-else>
+                    You have to be a member to check for your reports. <br />
+                    <button class="btn btn-light" @click="register">
+                        Register
+                    </button>
+                </div>
             </shell>
         </div>
 
@@ -17,11 +25,18 @@
 </template>
 
 <script>
+import { mapGetters } from "vuex";
+
 export default {
     data: function() {
         return {
             lastUserReports: []
         };
+    },
+    methods: {
+        register() {
+            this.$router.push({ name: "Register" });
+        }
     },
     mounted() {
         axios
@@ -32,6 +47,9 @@ export default {
             .catch(err => {
                 console.log(err);
             });
+    },
+    computed: {
+        ...mapGetters(["isLogged"])
     }
 };
 </script>

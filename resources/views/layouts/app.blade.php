@@ -16,6 +16,7 @@
     <!-- Fonts -->
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
+    <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
@@ -34,6 +35,17 @@
             </button>
 
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <form class="form-inline mx-auto">
+                    <div class="input-group input-group-lg">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <i class="fa fa-search"></i>
+                            </span>
+                        </div>
+                        <input type="text" class="form-control" placeholder="Search...">
+                    </div>
+                </form>
+
                 <!-- Right Side Of Navbar -->
                 <ul class="navbar-nav ml-auto">
                     <template v-if="isLogged">
