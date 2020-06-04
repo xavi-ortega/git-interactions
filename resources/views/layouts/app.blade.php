@@ -36,11 +36,9 @@
 
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
                 <form class="form-inline mx-auto">
-                    <div class="input-group input-group-lg">
+                    <div class="input-group input-group-lg" @click="search">
                         <div class="input-group-prepend">
-                            <span class="input-group-text">
-                                <i class="fa fa-search"></i>
-                            </span>
+                            <button class="btn btn-outline-secondary" type="button"><i class="fa fa-search"></i></button>
                         </div>
                         <input type="text" class="form-control" placeholder="Search...">
                     </div>
@@ -70,6 +68,8 @@
         <main class="py-4">
             @yield('content')
         </main>
+
+        <search></search>
     </div>
 </body>
 

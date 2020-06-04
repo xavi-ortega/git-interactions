@@ -33,6 +33,30 @@ class UsersController extends Controller
         return response($response, 201);
     }
 
+    public function register(request $request)
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        $token = $user->createToken('git-interactions')->plainTextToken;
+
+        $response = [
+            'user' => $user,
+            'token' => $token
+        ];
+
+        return response($response, 201);
+    }
+
     public function notifications(Request $request)
     {
         $user = User::find(1);

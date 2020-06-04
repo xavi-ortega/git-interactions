@@ -20,7 +20,7 @@ const routes = [
     },
     {
         name: "Report",
-        path: "/report",
+        path: "/report/:id",
         component: () => import("./pages/ReportPage")
     },
     {

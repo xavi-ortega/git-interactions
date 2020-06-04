@@ -63,6 +63,10 @@ const app = new Vue({
     },
 
     methods: {
+        search() {
+            $("#search").modal("show");
+        },
+
         logout() {
             this.$store.dispatch("logout");
         }

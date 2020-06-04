@@ -38,6 +38,27 @@ class ReportsController extends Controller
         );
     }
 
+    public function search(Request $request)
+    {
+        $request->validate([
+            'owner' => 'required',
+            'name' => 'required'
+        ]);
+
+        try {
+            $repository = $this->getOrCreateRepository($request->name, $request->owner);
+
+            $reports = $repository->reports()->latest()->take(5);
+
+            return response()->json([
+                'repository' => $repository,
+                'reports' => $reports
+            ]);
+        } catch (RepositoryNotFoundException $e) {
+            return response()->json(['error' => 'Repository not found'], 404);
+        }
+    }
+
     public function prepare(Request $request)
     {
         $user = $request->user();
@@ -63,24 +84,14 @@ class ReportsController extends Controller
         }
     }
 
-    public function report(Request $request)
+    public function report(Report $report)
     {
-        $request->validate([
-            'name' => 'required',
-            'owner' => 'required'
-        ]);
-
-        $start = microtime(true);
-
-        $repository = $this->getOrCreateRepository($request->name, $request->owner);
-
-        $report = $repository->reports()->with('issues', 'pull_requests', 'contributors', 'code')->latest()->first();
-
-        $time_elapsed_secs = microtime(true) - $start;
+        if ($report->progress) {
+            return $this->progress($report);
+        }
 
         return response()->json([
-            'time' => $time_elapsed_secs,
-            'repo' => $repository,
+            'repository' => $report->repository,
             'issues' => $report->issues,
             'pullRequests' => $report->pull_requests,
             'contributors' => $report->contributors,
@@ -88,21 +99,19 @@ class ReportsController extends Controller
         ]);
     }
 
-    public function progress(Request $request)
+    public function progress(Report $report)
     {
-        $request->validate([
-            'report_id' => 'required'
-        ]);
-
-        $report = Report::where('id', $request->report_id)->with('progress')->first();
-
-        if ($report === null || $report->progress === null) {
+        if (!$report || !$progress = $report->progress) {
             return response()->json([
                 'message' => 'The report is not in progress'
             ], 204);
         }
 
-        return response()->json($report->progress);
+        return response()->json([
+            'repository' => $report->repository,
+            'report' => $report,
+            'progress' => $progress
+        ]);
     }
 
     public function lastUserReports(Request $request)
@@ -149,6 +158,8 @@ class ReportsController extends Controller
             new MakeContributorsReport($repository, $report),
             new MakeCodeReport($repository, $report, $repositoryMetrics->branches->totalCount),
             function () use ($user, $report) {
+                $report->progress()->delete();
+
                 $user->notify(new ReportEnded($report));
             }
         ])->dispatch($repository, $report, $repositoryMetrics->issues->totalCount);

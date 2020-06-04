@@ -15,12 +15,14 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::post('login', 'UsersController@login');
+Route::post('register', 'UsersController@register');
 
 Route::group(['middleware' => 'auth:sanctum'], function () {
     Route::get('user/lastReports', 'ReportsController@lastUserReports');
 
-    Route::get('report', 'ReportsController@report');
-    Route::get('report/dispatch', 'ReportsController@prepare');
+    Route::post('report/search', 'ReportsController@search');
+    Route::post('report/prepare', 'ReportsController@prepare');
+    Route::get('report/{report}', 'ReportsController@report');
     Route::get('report/progress', 'ReportsController@progress');
 });
 

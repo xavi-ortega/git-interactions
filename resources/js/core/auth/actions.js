@@ -5,6 +5,12 @@ export default {
         });
     },
 
+    register({ commit }, data) {
+        return axios.post("/register", data).then(({ data }) => {
+            commit("setUserData", data);
+        });
+    },
+
     logout({ commit }) {
         commit("clearUserData");
     }

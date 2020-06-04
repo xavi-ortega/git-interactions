@@ -1,4 +1,5 @@
 export default {
     userReports: [],
-    popularReports: []
+    popularReports: [],
+    reports: {}
 };
