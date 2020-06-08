@@ -17,11 +17,10 @@ class CreateCodeReportsTable extends Migration
             $table->id();
 
             $table->foreignId('report_id')->constrained()->onDelete('cascade');
-            $table->integer('branches');
-            $table->integer('branches_without_activity');
             $table->decimal('prc_new_code');
             $table->decimal('prc_rewrite_others_code');
             $table->decimal('prc_rewrite_own_code');
+            $table->json('branches');
             $table->json('top_changed_files');
 
             $table->timestamps();

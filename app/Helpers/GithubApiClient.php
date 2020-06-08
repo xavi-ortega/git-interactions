@@ -635,9 +635,31 @@ class GithubApiClient
                 try {
                     return $this->client->runRawQuery($query, false, $params);
                 } catch (\Exception $e) {
-                    Log::error('error graphql');
-                    Log::error($query);
-                    Log::error($params);
+                    try {
+                        return $this->client->runRawQuery($query, false, $params);
+                    } catch (\Exception $e) {
+                        Log::error('error graphql retry 3');
+                        sleep(1);
+
+                        try {
+                            return $this->client->runRawQuery($query, false, $params);
+                        } catch (\Exception $e) {
+                            try {
+                                return $this->client->runRawQuery($query, false, $params);
+                            } catch (\Exception $e) {
+                                Log::error('error graphql retry 4');
+                                sleep(1);
+
+                                try {
+                                    return $this->client->runRawQuery($query, false, $params);
+                                } catch (\Exception $e) {
+                                    Log::error('error graphql');
+                                    Log::error($query);
+                                    Log::error($params);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

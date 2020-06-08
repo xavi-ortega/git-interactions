@@ -14,6 +14,10 @@ class Report extends Model
 {
     protected $guarded = [];
 
+    protected $hidden = [
+        'repository_id', 'user_id', 'deleted_at', 'updated_at'
+    ];
+
     public function repository()
     {
         return $this->belongsTo(Repository::class);

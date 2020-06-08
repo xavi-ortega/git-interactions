@@ -9,7 +9,9 @@ class Repository extends Model
 {
     protected $guarded = [];
 
-    protected $hidden = ['raw'];
+    protected $hidden = [
+        'raw', 'created_at', 'updated_at'
+    ];
 
     public function reports()
     {

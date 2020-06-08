@@ -74,7 +74,7 @@ class MakeIssuesReport implements ShouldQueue
 
         $repositoryIssues = $issueService->getRepositoryIssues($this->repository->name, $this->repository->owner, $this->totalIssues);
 
-        $oneHour = new DateInterval('PT1H');
+        $oneHour = Carbon::make('@0')->add(new DateInterval('PT1H'));
 
         $repositoryIssues->get()->each([$repositoryActions, 'registerIssue']);
 
@@ -89,11 +89,11 @@ class MakeIssuesReport implements ShouldQueue
 
             $intervalToClose = Carbon::make($issue->createdAt)->diff($issue->closedAt);
 
-            $closeTime = Carbon::make('@0')->add($intervalToClose)->timestamp;
+            $closeTime = Carbon::make('@0')->add($intervalToClose);
 
-            $total->closeTime->push($closeTime);
+            $total->closeTime->push($closeTime->timestamp);
 
-            if ($intervalToClose < $oneHour) {
+            if ($closeTime < $oneHour) {
                 $total->closedInLessThanOneHour;
             }
 

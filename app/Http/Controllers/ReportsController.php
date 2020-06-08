@@ -48,11 +48,14 @@ class ReportsController extends Controller
         try {
             $repository = $this->getOrCreateRepository($request->name, $request->owner);
 
-            $reports = $repository->reports()->latest()->take(5);
+            $reports = $repository->reports()->latest()->take(5)->get();
 
             return response()->json([
                 'repository' => $repository,
-                'reports' => $reports
+                'reports' => $reports->map(function ($report) {
+                    $report->since = $report->created_at->diffForHumans();
+                    return $report;
+                })
             ]);
         } catch (RepositoryNotFoundException $e) {
             return response()->json(['error' => 'Repository not found'], 404);
@@ -92,6 +95,10 @@ class ReportsController extends Controller
 
         return response()->json([
             'repository' => $report->repository,
+            'report' => [
+                'id' => $report->id,
+                'progress' => null
+            ],
             'issues' => $report->issues,
             'pullRequests' => $report->pull_requests,
             'contributors' => $report->contributors,

@@ -2,21 +2,20 @@
 
 namespace App\Helpers;
 
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class GithubRepositoryBranches
 {
     private $collection;
     private $endCursor;
-    private $commitEndCursors;
 
     public function __construct(array $branches = [])
     {
         $this->collection = collect(
             $this->formatBranches($branches)
         );
-
-        $this->commitEndCursors = collect();
     }
 
     public function add(array $branches)
@@ -44,7 +43,7 @@ class GithubRepositoryBranches
     private function formatBranches(array $rawBranches)
     {
         return array_map(function ($branch) {
-            $lastActivity = count($branch->commits->history->nodes) > 1 ? $branch->commits->history->nodes[0]->pushedDate : null;
+            $lastActivity = count($branch->commits->history->nodes) > 0 ? Carbon::make($branch->commits->history->nodes[0]->pushedDate)->diffForHumans() : null;
 
             return (object) [
                 'name' => $branch->name,

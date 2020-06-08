@@ -64,7 +64,7 @@ class MakePullRequestsReport implements ShouldQueue
 
         $repositoryPullRequests = $pullRequestService->getRepositoryPullRequests($this->repository->name, $this->repository->owner, $this->totalPullRequests);
 
-        $oneHour = new DateInterval('PT1H');
+        $oneHour = Carbon::make('@0')->add(new DateInterval('PT1H'));
 
         $repositoryPullRequests->get()->each([$repositoryActions, 'registerPullRequest']);
 
@@ -90,17 +90,17 @@ class MakePullRequestsReport implements ShouldQueue
             $intervalToClose = Carbon::make($pullRequest->createdAt)->diff($pullRequest->closedAt);
             $intervalToMerge = Carbon::make($pullRequest->createdAt)->diff($pullRequest->mergedAt);
 
-            $closeTime = Carbon::make('@0')->add($intervalToClose)->timestamp;
-            $mergeTime = Carbon::make('@0')->add($intervalToMerge)->timestamp;
+            $closeTime = Carbon::make('@0')->add($intervalToClose);
+            $mergeTime = Carbon::make('@0')->add($intervalToMerge);
 
-            $total->closeTime->push($closeTime);
-            $total->mergeTime->push($mergeTime);
+            $total->closeTime->push($closeTime->timestamp);
+            $total->mergeTime->push($mergeTime->timestamp);
 
-            if ($intervalToClose < $oneHour) {
+            if ($closeTime < $oneHour) {
                 $total->closedInLessThanOneHour++;
             }
 
-            if ($intervalToMerge < $oneHour) {
+            if ($mergeTime < $oneHour) {
                 $total->mergedInLessThanOneHour++;
             }
 

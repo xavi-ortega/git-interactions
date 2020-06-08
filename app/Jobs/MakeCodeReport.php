@@ -2,19 +2,21 @@
 
 namespace App\Jobs;
 
-use App\Helpers\Constants\ReportProgressType;
 use App\Report;
 use DateInterval;
+use Carbon\Carbon;
 use App\Repository;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\GithubRepositoryActions;
-use App\Services\GithubRepositoryBranchService;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use App\Helpers\Constants\ReportProgressType;
+use App\Services\GithubRepositoryBranchService;
 
 const IGNORED_FILES = [
     'package.json', 'package-lock.json'
@@ -71,8 +73,6 @@ class MakeCodeReport implements ShouldQueue
 
         $actions = $repositoryActions->get();
 
-        $oneMonth = new DateInterval('P1M');
-
         $files = collect();
 
         $actions->get('commits')->each(function ($commit) use ($files) {
@@ -88,7 +88,8 @@ class MakeCodeReport implements ShouldQueue
                         if ($file) {
                             $file->renames->push((object) [
                                 'old' => $oldFile,
-                                'new' => $fileName
+                                'new' => $fileName,
+                                'date' => Carbon::make($commit->date)->diffForHumans()
                             ]);
                         }
                     } else if ($files->has($fileName)) {
@@ -148,17 +149,22 @@ class MakeCodeReport implements ShouldQueue
             'rewriteOthers' => 0
         ]);
 
+        $oneMonth = Carbon::make('1 month ago');
+
         $this->report->code()->create([
-            'branches' => $actions->get('branches')->count(),
-            'branches_without_activity' => $actions->get('branches')->filter(function ($branch) use ($oneMonth) {
-                return $branch->lastActivity < $oneMonth;
-            })->count(),
+            'branches' => $actions->get('branches')->map(function ($branch) use ($oneMonth) {
+                $branch->active = Carbon::make($branch->lastActivity) > $oneMonth;
+                return $branch;
+            }),
             'prc_new_code' => round($code->new / $code->lines * 100, 2),
             'prc_rewrite_others_code' => round($code->rewriteOthers / $code->lines * 100, 2),
             'prc_rewrite_own_code' => round($code->rewriteOwn / $code->lines * 100, 2),
             'top_changed_files' => $files->sort(function ($a, $b) {
                 return $b->patches->count() - $a->patches->count();
-            })->take(10)
+            })->take(10)->map(function ($file) {
+                $file->contributors = $file->patches->pluck('owner.email')->unique();
+                return $file;
+            })
         ]);
 
         // UPDATE BACKUP

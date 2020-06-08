@@ -1,27 +1,29 @@
 <template>
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <shell title="My searches">
-        <template v-if="isLogged">
-          <ul v-if="lastUserReports.length">
-            <li v-for="report in lastUserReports" :key="report.id">
-              <router-link
-                :to="{ name: 'Report', params: { id: report.id }}"
-              >{{ report.repository.slug }}</router-link>
-            </li>
-          </ul>
-        </template>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <shell title="My searches">
+          <template v-if="isLogged">
+            <ul v-if="lastUserReports.length">
+              <li v-for="report in lastUserReports" :key="report.id">
+                <router-link
+                  :to="{ name: 'Report', params: { id: report.id }}"
+                >{{ report.repository.slug }}</router-link>
+              </li>
+            </ul>
+          </template>
 
-        <div class="alert alert-warning" v-else>
-          You have to be a member to check for your reports.
-          <br />
-          <button class="btn btn-light" @click="register">Register</button>
-        </div>
-      </shell>
-    </div>
+          <div class="alert alert-warning" v-else>
+            You have to be a member to check for your reports.
+            <br />
+            <button class="btn btn-light" @click="register">Register</button>
+          </div>
+        </shell>
+      </div>
 
-    <div class="col-md-6">
-      <shell title="Popular searches"></shell>
+      <div class="col-md-6">
+        <shell title="Popular searches"></shell>
+      </div>
     </div>
   </div>
 </template>

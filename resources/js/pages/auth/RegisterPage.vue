@@ -95,7 +95,7 @@ export default {
       name: "",
       email: "",
       password: "",
-      passsword_confirmation: ""
+      password_confirmation: ""
     };
   },
 
@@ -106,7 +106,7 @@ export default {
           name: this.name,
           email: this.email,
           password: this.password,
-          password_confirmation: this.passsword_confirmation
+          password_confirmation: this.password_confirmation
         })
         .then(() => {
           this.$router.push({ name: "Home" });

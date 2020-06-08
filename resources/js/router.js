@@ -7,7 +7,14 @@ import HomePage from "./pages/HomePage";
 Vue.use(VueRouter);
 
 const routes = [
-    { name: "Home", path: "/", component: HomePage },
+    {
+        name: "Home",
+        path: "/",
+        meta: {
+            auth: true
+        },
+        component: HomePage
+    },
     {
         name: "Login",
         path: "/login",
@@ -21,6 +28,9 @@ const routes = [
     {
         name: "Report",
         path: "/report/:id",
+        meta: {
+            auth: true
+        },
         component: () => import("./pages/ReportPage")
     },
     {
