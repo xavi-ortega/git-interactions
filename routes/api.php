@@ -22,8 +22,9 @@ Route::group(['middleware' => 'auth:sanctum'], function () {
 
     Route::post('report/search', 'ReportsController@search');
     Route::post('report/prepare', 'ReportsController@prepare');
-    Route::get('report/{report}', 'ReportsController@report');
     Route::get('report/progress', 'ReportsController@progress');
+    Route::get('report/queue', 'ReportsController@queue');
+    Route::get('report/{report}', 'ReportsController@report');
 });
 
 Route::get('rate-limit', 'ReportsController@rateLimit');

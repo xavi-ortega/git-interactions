@@ -12,13 +12,15 @@ use Illuminate\Http\Request;
 use App\Jobs\MakeIssuesReport;
 
 use App\Helpers\GithubApiClient;
+use App\Notifications\ReportEnded;
+use Illuminate\Support\Facades\DB;
 use App\Jobs\MakeContributorsReport;
 use App\Jobs\MakePullRequestsReport;
-use App\Services\GithubRepositoryService;
-use App\Exceptions\RepositoryNotFoundException;
-use App\Helpers\Constants\ReportProgressType;
-use App\Notifications\ReportEnded;
 use App\Notifications\ReportStarted;
+use App\Services\GithubRepositoryService;
+use App\Helpers\Constants\ReportProgressType;
+use App\Exceptions\RepositoryNotFoundException;
+use App\ReportProgress;
 
 class ReportsController extends Controller
 {
@@ -119,6 +121,13 @@ class ReportsController extends Controller
             'report' => $report,
             'progress' => $progress
         ]);
+    }
+
+    public function queue()
+    {
+        $queue = ReportProgress::with('report')->get();
+
+        return response()->json($queue);
     }
 
     public function lastUserReports(Request $request)

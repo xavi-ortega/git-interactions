@@ -50,3 +50,24 @@
     position: absolute;
     bottom: 50px;
 }
+
+.commit-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    img {
+        max-width: 110px;
+    }
+
+    i.fa-long-arrow-right {
+        font-size: 2rem;
+    }
+
+    div {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        align-items: center;
+    }
+}
