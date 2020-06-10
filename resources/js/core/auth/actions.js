@@ -1,12 +1,14 @@
+import { AuthService } from "../../services/auth-service";
+
 export default {
     login({ commit }, credentials) {
-        return axios.post("/login", credentials).then(({ data }) => {
+        return AuthService.login(credentials).then(({ data }) => {
             commit("setUserData", data);
         });
     },
 
     register({ commit }, data) {
-        return axios.post("/register", data).then(({ data }) => {
+        return AuthService.register(data).then(({ data }) => {
             commit("setUserData", data);
         });
     },

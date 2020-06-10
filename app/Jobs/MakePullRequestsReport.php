@@ -45,7 +45,7 @@ class MakePullRequestsReport implements ShouldQueue
     public function handle(GithubRepositoryPullRequestsService $pullRequestService)
     {
         // START PROGRESS
-        $progress = $this->report->progress();
+        $progress = $this->report->progress;
 
         $progress->update([
             'type' => ReportProgressType::FETCHING_PULL_REQUESTS,

@@ -10,16 +10,12 @@
 
 <script>
 export default {
-    mounted() {
-        axios.get("/report/queue").then(response => {
-            this.queue = response.data;
-        });
-    },
+    mounted() {},
 
-    data() {
-        return {
-            queue: []
-        };
+    props: {
+        queue: {
+            default: () => []
+        }
     }
 };
 </script>

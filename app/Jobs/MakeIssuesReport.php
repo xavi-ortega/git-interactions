@@ -45,7 +45,7 @@ class MakeIssuesReport implements ShouldQueue
     public function handle(GithubRepositoryIssueService $issueService)
     {
         // START PROGRESS
-        $progress = $this->report->progress();
+        $progress = $this->report->progress;
 
         $progress->update([
             'type' => ReportProgressType::FETCHING_ISSUES,

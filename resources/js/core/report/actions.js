@@ -1,6 +1,8 @@
+import { ReportService } from "../../services/report-service";
+
 export default {
     fetchReport({ commit }, { id }) {
-        return axios.get(`/report/${id}`).then(({ data }) => {
+        return ReportService.fetchById(id).then(({ data }) => {
             commit("addReport", data);
         });
     }

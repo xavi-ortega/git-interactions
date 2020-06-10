@@ -14,8 +14,6 @@ import reportGetters from "./report/getters";
 
 Vue.use(Vuex);
 
-axios.defaults.baseURL = "http://localhost:8000/api";
-
 export default new Vuex.Store({
     state: {
         ...auth,

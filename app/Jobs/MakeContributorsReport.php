@@ -47,7 +47,7 @@ class MakeContributorsReport implements ShouldQueue
     public function handle(GitCommitService $commitService, GithubContributorService $contributorService)
     {
         // START PROGRESS
-        $progress = $this->report->progress();
+        $progress = $this->report->progress;
 
         $progress->update([
             'type' => ReportProgressType::FETCHING_CONTRIBUTORS,

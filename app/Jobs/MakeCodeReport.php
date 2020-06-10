@@ -50,7 +50,7 @@ class MakeCodeReport implements ShouldQueue
     public function handle(GithubRepositoryBranchService $branchService)
     {
         // START PROGRESS
-        $progress = $this->report->progress();
+        $progress = $this->report->progress;
 
         $progress->update([
             'type' => ReportProgressType::FETCHING_CODE,

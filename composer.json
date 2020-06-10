@@ -9,6 +9,7 @@
     "license": "MIT",
     "require": {
         "php": "^7.2.5",
+        "beyondcode/laravel-websockets": "^1.4",
         "czproject/git-php": "^3.17",
         "fideloper/proxy": "^4.2",
         "fruitcake/laravel-cors": "^1.0",
@@ -19,6 +20,7 @@
         "laravel/tinker": "^2.0",
         "laravel/ui": "^2.0",
         "nyholm/psr7": "^1.2",
+        "pusher/pusher-php-server": "~3.0",
         "symfony/process": "^5.0",
         "symfony/psr-http-message-bridge": "^2.0"
     },
