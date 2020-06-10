@@ -174,7 +174,9 @@ class ReportsController extends Controller
             new MakeContributorsReport($repository, $report),
             new MakeCodeReport($repository, $report, $repositoryMetrics->branches->totalCount),
             function () use ($user, $report) {
-                $report->progress()->delete();
+                $progress = $report->progress;
+
+                $progress->delete();
 
                 $user->notify(new ReportEnded($report));
             }
