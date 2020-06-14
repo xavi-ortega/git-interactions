@@ -8,9 +8,11 @@ require("./bootstrap");
 
 window.Vue = require("vue");
 
+import Echo from "laravel-echo";
 import router from "./router";
 import store from "./core";
 import { mapGetters } from "vuex";
+import { AuthService } from "./services/auth-service";
 
 /**
  * The following block of code may be used to automatically register your
@@ -42,9 +44,9 @@ const app = new Vue({
     router,
     store,
     created() {
-        const userInfo = localStorage.getItem("user");
-        if (userInfo) {
-            const userData = JSON.parse(userInfo);
+        const userData = AuthService.check();
+
+        if (userData) {
             this.$store.commit("setUserData", userData);
         }
 
@@ -57,18 +59,23 @@ const app = new Vue({
                 return Promise.reject(error);
             }
         );
+
+        window.Echo = new Echo({
+            broadcaster: "pusher",
+            key: process.env.MIX_PUSHER_APP_KEY,
+            cluster: process.env.MIX_PUSHER_APP_CLUSTER,
+            encrypted: false,
+            wsHost: window.location.hostname,
+            wsPort: 6001,
+            disableStats: true,
+            auth: {
+                headers: {
+                    Authorization: `Bearer ${userData.token}`
+                }
+            }
+        });
     },
     computed: {
         ...mapGetters(["isLogged"])
-    },
-
-    methods: {
-        search() {
-            $("#search").modal("show");
-        },
-
-        logout() {
-            this.$store.dispatch("logout");
-        }
     }
 });

@@ -19,8 +19,11 @@ Route::post('register', 'UsersController@register');
 
 Route::group(['middleware' => 'auth:sanctum'], function () {
     Route::get('user/lastReports', 'ReportsController@lastUserReports');
+    Route::get('user/notifications', 'UsersController@notifications');
+    Route::post('user/notifications/{notification}', 'UserController@notificationVisited');
 
     Route::post('report/search', 'ReportsController@search');
+    Route::get('report/popular', 'ReportsController@popularReports');
     Route::post('report/prepare', 'ReportsController@prepare');
     Route::get('report/progress', 'ReportsController@progress');
     Route::get('report/queue', 'ReportsController@queue');
@@ -28,5 +31,3 @@ Route::group(['middleware' => 'auth:sanctum'], function () {
 });
 
 Route::get('rate-limit', 'ReportsController@rateLimit');
-
-Route::get('user/notifications', 'UsersController@notifications');

@@ -14,6 +14,7 @@ export default {
     },
 
     logout({ commit }) {
+        AuthService.logout();
         commit("clearUserData");
     }
 };

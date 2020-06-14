@@ -40,7 +40,7 @@
                         <a
                             href="#"
                             class="list-group-item"
-                            @click="go(report.id)"
+                            @click="go(report)"
                             v-for="report in searchResults.reports"
                             :key="report.id"
                         >
@@ -81,8 +81,15 @@ export default {
     },
 
     methods: {
-        go(id) {
-            this.$router.push({ name: "Report", params: { id } });
+        go(report) {
+            this.$router.push({
+                name: "Report",
+                params: {
+                    id: report.id,
+                    name: report.repository.name,
+                    owner: report.repository.owner
+                }
+            });
             this.dismiss();
         },
 
@@ -139,7 +146,7 @@ export default {
                 .then(({ data }) => {
                     this.$router.push({
                         name: "Report",
-                        params: { id: data.report.id }
+                        params: { owner, name, id: data.report.id }
                     });
                     this.dismiss();
                 })

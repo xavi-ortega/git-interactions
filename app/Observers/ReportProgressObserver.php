@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Events\ReportFinished;
 use App\Events\ReportProgressUpdated;
 use App\Events\ReportQueueUpdated;
 use App\ReportProgress;

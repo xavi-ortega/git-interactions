@@ -8,13 +8,17 @@ use App\Helpers\GitParser;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Helpers\ReportProgressManager;
 use App\Exceptions\ParseEndedException;
 
 class GitCommitService
 {
-    public function process(string $patches): Collection
+    public function process($total, string $patches): Collection
     {
         Log::debug('Start processing');
+        $manager = resolve(ReportProgressManager::class);
+        $count = 1;
+
         $parser = new GitParser(trim($patches));
 
         $commits = collect();
@@ -31,6 +35,11 @@ class GitCommitService
                 'date' => $this->processDate($parser),
                 'diffs' => $this->processDiffs($parser)
             ]);
+
+            $progress = $this->map($count, 1, $total, 26, 90);
+            $manager->setProgress($progress);
+
+            $count++;
         }
 
         return $commits;
@@ -170,5 +179,10 @@ class GitCommitService
                 'patches' => $patches
             ];
         }
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

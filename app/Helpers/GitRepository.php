@@ -10,4 +10,9 @@ class GitRepository extends BaseGitRepository
     {
         return $this->begin()->run('git log -p --reverse -U0 > ' . $outputFile);
     }
+
+    public function getCommitCount(string $branch)
+    {
+        return $this->begin()->extractFromCommand('git rev-list --count ' . $branch)[0];
+    }
 }

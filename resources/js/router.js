@@ -27,7 +27,7 @@ const routes = [
     },
     {
         name: "Report",
-        path: "/report/:id",
+        path: "/report/:owner/:name/:id",
         meta: {
             auth: true
         },
@@ -54,6 +54,7 @@ router.beforeResolve((to, from, next) => {
     if (to.matched.some(record => record.meta.auth) && !loggedIn) {
         NProgress.start();
         next("/login");
+        NProgress.done();
         return;
     }
 

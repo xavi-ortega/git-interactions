@@ -9,5 +9,9 @@ export const ReportService = {
 
     async fetchLast() {
         return axios.get("/user/lastReports");
+    },
+
+    async fetchPopular() {
+        return axios.get("/report/popular");
     }
 };

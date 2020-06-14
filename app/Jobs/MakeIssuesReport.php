@@ -14,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Helpers\GithubRepositoryActions;
+use App\Helpers\ReportProgressManager;
 use App\Services\GithubRepositoryIssueService;
 
 class MakeIssuesReport implements ShouldQueue
@@ -47,10 +48,11 @@ class MakeIssuesReport implements ShouldQueue
         // START PROGRESS
         $progress = $this->report->progress;
 
-        $progress->update([
-            'type' => ReportProgressType::FETCHING_ISSUES,
-            'progress' => 0
-        ]);
+        $manager = resolve(ReportProgressManager::class);
+
+        $manager->focusOn($progress);
+
+        $manager->setStep(ReportProgressType::FETCHING_ISSUES);
 
         // RETRIEVE OR CREATE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
@@ -78,7 +80,9 @@ class MakeIssuesReport implements ShouldQueue
 
         $repositoryIssues->get()->each([$repositoryActions, 'registerIssue']);
 
-        $total = $repositoryActions->get('issues')->reduce(function ($total, $issue) use ($oneHour) {
+        $count = 1;
+
+        $total = $repositoryActions->get('issues')->reduce(function ($total, $issue) use ($oneHour, $count, $manager) {
             $total->issues++;
 
             if ($issue->closed) {
@@ -96,6 +100,9 @@ class MakeIssuesReport implements ShouldQueue
             if ($closeTime < $oneHour) {
                 $total->closedInLessThanOneHour;
             }
+
+            $manager->setProgress($this->map($count, 1, $this->totalIssues, 91, 99));
+            $count++;
 
             return $total;
         }, (object) [
@@ -135,8 +142,11 @@ class MakeIssuesReport implements ShouldQueue
         $this->repository->save();
 
         // END PROGRESS
-        $progress->update([
-            'progress' => 100
-        ]);
+        $manager->setProgress(100);
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

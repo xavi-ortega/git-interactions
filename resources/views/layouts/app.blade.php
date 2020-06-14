@@ -25,50 +25,13 @@
 
 <body>
     <div id="app">
-        <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm">
-
-            <router-link to="/">
-                {{ config('app.name', 'Laravel') }}
-            </router-link>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{{ __('Toggle navigation') }}">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <form class="form-inline mx-auto">
-                    <div class="input-group input-group-lg" @click="search">
-                        <div class="input-group-prepend">
-                            <button class="btn btn-outline-secondary" type="button"><i class="fa fa-search"></i></button>
-                        </div>
-                        <input type="text" class="form-control" placeholder="Search...">
-                    </div>
-                </form>
-
-                <!-- Right Side Of Navbar -->
-                <ul class="navbar-nav ml-auto">
-                    <template v-if="isLogged">
-                        <button type="button" @click="logout()" v-if="isLogged">
-                            Logout
-                        </button>
-                    </template>
-
-                    <template v-else>
-                        <li>
-                            <router-link to="/login">Login</router-link>
-                        </li>
-                        <li>
-                            <router-link to="/register">Register</router-link>
-                        </li>
-                    </template>
-                </ul>
-            </div>
-
-        </nav>
+        <header></header>
 
         <main class="py-4">
             @yield('content')
         </main>
 
+        <footer></footer>
         <search></search>
     </div>
 </body>

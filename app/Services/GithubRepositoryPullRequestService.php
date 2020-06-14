@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Helpers\GithubApiClient;
 use Illuminate\Support\Facades\Log;
+use App\Helpers\ReportProgressManager;
 use App\Helpers\GithubRepositoryPullRequests;
 
 const MAX_PULL_REQUESTS = 90;
@@ -21,6 +22,8 @@ class GithubRepositoryPullRequestsService
     public function getRepositoryPullRequests(string $name, string $owner, int $total): GithubRepositoryPullRequests
     {
         $repositoryPullRequests = new GithubRepositoryPullRequests();
+
+        $manager = resolve(ReportProgressManager::class);
 
         $pages = floor($total / MAX_PULL_REQUESTS + 1);
         $lastPageCount = $total % MAX_PULL_REQUESTS;
@@ -41,6 +44,10 @@ class GithubRepositoryPullRequestsService
 
             $after = $paginatedPullRequests->pageInfo->endCursor;
 
+
+            $progress = $this->map($i, 1, $pages, 1, 90);
+            $manager->setProgress($progress);
+
             Log::debug($i . ' of ' . $pages . ' pages of pullRequests');
         }
 
@@ -59,6 +66,13 @@ class GithubRepositoryPullRequestsService
 
         Log::debug($i . ' of ' . $pages . ' pages of pullRequests');
 
+        $manager->setProgress(90);
+
         return $repositoryPullRequests;
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

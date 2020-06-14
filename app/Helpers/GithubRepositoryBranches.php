@@ -25,12 +25,12 @@ class GithubRepositoryBranches
         );
     }
 
-    public function setEndCursor(string $endCursor)
+    public function setEndCursor($endCursor)
     {
         $this->endCursor = $endCursor;
     }
 
-    public function getEndCursor(): string
+    public function getEndCursor()
     {
         return $this->endCursor;
     }

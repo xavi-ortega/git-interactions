@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Helpers\Constants\ReportProgressType;
 use Exception;
 use App\Report;
 use Carbon\Carbon;
@@ -13,6 +12,7 @@ use App\Helpers\GitRepository;
 use App\Services\GitCommitService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Helpers\ReportProgressManager;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\GithubRepositoryActions;
@@ -20,6 +20,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use App\Services\GithubContributorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use App\Helpers\Constants\ReportProgressType;
 
 class MakeContributorsReport implements ShouldQueue
 {
@@ -49,10 +50,11 @@ class MakeContributorsReport implements ShouldQueue
         // START PROGRESS
         $progress = $this->report->progress;
 
-        $progress->update([
-            'type' => ReportProgressType::FETCHING_CONTRIBUTORS,
-            'progress' => 0
-        ]);
+        $manager = resolve(ReportProgressManager::class);
+
+        $manager->focusOn($progress);
+
+        $manager->setStep(ReportProgressType::FETCHING_CONTRIBUTORS);
 
         // RETRIEVE BACKUP
         $rawPath = "{$this->repository->id}/raw.json";
@@ -73,20 +75,36 @@ class MakeContributorsReport implements ShouldQueue
             $cloned = new GitRepository($clonePath);
         }
 
+        $manager->setProgress(20);
+
         $cloned->checkout('master');
+
+        $manager->setProgress(21);
 
         $cloned->logPatches($this->repository->name . '.log');
 
+        $manager->setProgress(24);
+
+        $commitCount = $cloned->getCommitCount('master');
+
+        $manager->setProgress(25);
+
         $path = $clonePath . '/' . $this->repository->name . '.log';
 
-        $repositoryCommits = $commitService->process($path);
+        $repositoryCommits = $commitService->process($commitCount, $path);
 
-        $repositoryCommits->each(function ($commit) use ($contributorService, $repositoryActions) {
+        $count = 1;
+
+        $repositoryCommits->each(function ($commit) use ($contributorService, $repositoryActions, $count, $commitCount, $manager) {
             if (!$repositoryActions->get('contributors')->has($commit->author->email)) {
                 Log::info('fetching contributor: ' . $commit->author->email . ' at ' . $commit->id);
                 $contributor = $contributorService->getByCommit($this->repository->name, $this->repository->owner, $commit->id);
                 $repositoryActions->registerContributor($contributor);
             }
+
+            $progress = $this->map($count, 1, $commitCount, 91, 99);
+            $manager->setProgress($progress);
+            $count++;
 
             $repositoryActions->registerCommit($commit);
         });
@@ -117,9 +135,7 @@ class MakeContributorsReport implements ShouldQueue
         Storage::disk('raw')->put($rawPath, $raw);
 
         // END PROGRESS
-        $progress->update([
-            'progress' => 100
-        ]);
+        $manager->setProgress(100);
     }
 
     private function getFilesPerCommit(Collection $actions): Collection
@@ -279,5 +295,10 @@ class MakeContributorsReport implements ShouldQueue
 
             return round($unexpectedReviewers->count() / $totalReviewers * 100, 2);
         });
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

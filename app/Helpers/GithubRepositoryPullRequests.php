@@ -23,7 +23,7 @@ class GithubRepositoryPullRequests
         );
     }
 
-    public function setEndCursor(string $endCursor)
+    public function setEndCursor($endCursor)
     {
         $this->endCursor = $endCursor;
     }
@@ -33,7 +33,7 @@ class GithubRepositoryPullRequests
         return $this->collection;
     }
 
-    public function getEndCursor(): string
+    public function getEndCursor()
     {
         return $this->endCursor;
     }

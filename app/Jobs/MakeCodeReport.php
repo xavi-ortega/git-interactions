@@ -9,6 +9,7 @@ use App\Repository;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\Log;
+use App\Helpers\ReportProgressManager;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\GithubRepositoryActions;
@@ -52,10 +53,11 @@ class MakeCodeReport implements ShouldQueue
         // START PROGRESS
         $progress = $this->report->progress;
 
-        $progress->update([
-            'type' => ReportProgressType::FETCHING_CODE,
-            'progress' => 0
-        ]);
+        $manager = resolve(ReportProgressManager::class);
+
+        $manager->focusOn($progress);
+
+        $manager->setStep(ReportProgressType::FETCHING_CODE);
 
         // RETRIEVE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
@@ -75,7 +77,11 @@ class MakeCodeReport implements ShouldQueue
 
         $files = collect();
 
-        $actions->get('commits')->each(function ($commit) use ($files) {
+        $totalCommits = $actions->get('commits')->count();
+
+        $count = 1;
+
+        $actions->get('commits')->each(function ($commit) use ($files, $totalCommits, $count, $manager) {
             $commit->diffs->each(function ($diff) use ($files, $commit) {
                 $oldFile = $diff->oldFile;
                 $fileName = $diff->newFile;
@@ -115,9 +121,17 @@ class MakeCodeReport implements ShouldQueue
                     }
                 }
             });
+
+            $progress = $this->map($count, 1, $totalCommits, 51, 75);
+            $manager->setProgress($progress);
+
+            $count++;
         });
 
-        $code = $files->reduce(function ($total, $file) {
+        $totalFiles = $files->count();
+        $count = 1;
+
+        $code = $files->reduce(function ($total, $file) use ($count, $totalFiles, $manager) {
             $fileMap = collect();
 
             $file->patches->each(function ($patch) use ($total, $fileMap) {
@@ -140,6 +154,11 @@ class MakeCodeReport implements ShouldQueue
                     }
                 }
             });
+
+            $progress = $this->map($count, 1, $totalFiles, 76, 99);
+            $manager->setProgress($progress);
+
+            $count++;
 
             return $total;
         }, (object) [
@@ -180,5 +199,10 @@ class MakeCodeReport implements ShouldQueue
         $progress->update([
             'progress' => 100
         ]);
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

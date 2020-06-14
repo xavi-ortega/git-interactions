@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Helpers\ReportProgressManager;
 use App\Observers\ReportProgressObserver;
 use App\ReportProgress;
 use Illuminate\Support\ServiceProvider;
@@ -15,7 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->app->singleton('App\Helpers\ReportProgressManager', function () {
+            return new ReportProgressManager();
+        });
     }
 
     /**

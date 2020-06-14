@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\User;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Hash;
 
 class UsersController extends Controller
@@ -59,8 +60,23 @@ class UsersController extends Controller
 
     public function notifications(Request $request)
     {
-        $user = User::find(1);
+        $user = $request->user();
 
         return $user->notifications;
+    }
+
+    public function notificationVisited(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $notification = $user->notifications()->find($id);
+
+        if ($notification) {
+            $notification->markAsRead();
+        }
+
+        return response()->json([
+            'message' => 'Notification marked as read'
+        ]);
     }
 }

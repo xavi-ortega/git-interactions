@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Helpers\GithubApiClient;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\GithubRepositoryIssues;
+use App\Helpers\ReportProgressManager;
 
 const MAX_ISSUES = 100;
 
@@ -20,6 +21,8 @@ class GithubRepositoryIssueService
     public function getRepositoryIssues(string $name, string $owner, int $total): GithubRepositoryIssues
     {
         $repositoryIssues = new GithubRepositoryIssues();
+
+        $manager = resolve(ReportProgressManager::class);
 
         $pages = floor($total / MAX_ISSUES + 1);
         $lastPageCount = $total % MAX_ISSUES;
@@ -40,6 +43,9 @@ class GithubRepositoryIssueService
 
             $after = $paginatedIssues->pageInfo->endCursor;
 
+            $progress = $this->map($i, 1, $pages, 1, 90);
+            $manager->setProgress($progress);
+
             Log::debug($i . ' of ' . $pages . ' pages of issues');
         }
 
@@ -58,7 +64,14 @@ class GithubRepositoryIssueService
 
         Log::debug($i . ' of ' . $pages . ' pages of issues');
 
+        $manager->setProgress(90);
+
 
         return $repositoryIssues;
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

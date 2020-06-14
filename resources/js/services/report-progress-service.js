@@ -1,9 +1,8 @@
 export const ReportProgressService = {
-    connectReportProgress(id, callback) {
-        return window.Echo.channel(`report-progress-${id}`).listen(
-            ".progress.updated",
-            callback
-        );
+    connectReportProgress(id, onProgress, onEnded) {
+        return window.Echo.channel(`report-progress-${id}`)
+            .listen(".progress.updated", onProgress)
+            .listen(".progress.finished", onEnded);
     },
 
     disconnectReportProgress(id) {

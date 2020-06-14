@@ -2,18 +2,19 @@
 
 namespace App\Jobs;
 
-use App\Helpers\Constants\ReportProgressType;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
 use App\Repository;
 use Illuminate\Bus\Queueable;
+use App\Helpers\ReportProgressManager;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use App\Helpers\GithubRepositoryActions;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryActions;
+use App\Helpers\Constants\ReportProgressType;
 use App\Services\GithubRepositoryPullRequestsService;
 
 class MakePullRequestsReport implements ShouldQueue
@@ -47,10 +48,11 @@ class MakePullRequestsReport implements ShouldQueue
         // START PROGRESS
         $progress = $this->report->progress;
 
-        $progress->update([
-            'type' => ReportProgressType::FETCHING_PULL_REQUESTS,
-            'progress' => 0
-        ]);
+        $manager = resolve(ReportProgressManager::class);
+
+        $manager->focusOn($progress);
+
+        $manager->setStep(ReportProgressType::FETCHING_PULL_REQUESTS);
 
         // RETRIEVE BACKUP
         $pointerPath = "{$this->repository->id}/pointer.json";
@@ -68,7 +70,9 @@ class MakePullRequestsReport implements ShouldQueue
 
         $repositoryPullRequests->get()->each([$repositoryActions, 'registerPullRequest']);
 
-        $total = $repositoryActions->get('pullRequests')->reduce(function ($total, $pullRequest) use ($oneHour) {
+        $count = 1;
+
+        $total = $repositoryActions->get('pullRequests')->reduce(function ($total, $pullRequest) use ($oneHour, $count, $manager) {
             $total->pullRequests++;
 
             if ($pullRequest->closed) {
@@ -103,6 +107,9 @@ class MakePullRequestsReport implements ShouldQueue
             if ($mergeTime < $oneHour) {
                 $total->mergedInLessThanOneHour++;
             }
+
+            $manager->setProgress($this->map($count, 1, $this->totalPullRequests, 91, 99));
+            $count++;
 
             return $total;
         }, (object) [
@@ -154,8 +161,11 @@ class MakePullRequestsReport implements ShouldQueue
         Storage::disk('raw')->put($rawPath, $raw);
 
         // END PROGRESS
-        $progress->update([
-            'progress' => 100
-        ]);
+        $manager->setProgress(100);
+    }
+
+    private function map($x, $in_min, $in_max, $out_min, $out_max)
+    {
+        return ($x - $in_min) * ($out_max - $out_min) / ($in_max - $in_min) + $out_min;
     }
 }

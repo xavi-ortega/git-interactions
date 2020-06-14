@@ -4,9 +4,10 @@ namespace App\Notifications;
 
 use App\Report;
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
+use Illuminate\Notifications\Messages\BroadcastMessage;
 
 class ReportStarted extends Notification
 {
@@ -68,5 +69,13 @@ class ReportStarted extends Notification
             'url' => "reports/{$this->report->repository->slug}/{$this->report->id}",
             'message' => "A new report of {$this->report->repository->slug} is in progress"
         ];
+    }
+
+    public function toBroadcast($notifiable)
+    {
+        return new BroadcastMessage([
+            'url' => "/report/{$this->report->repository->slug}/{$this->report->id}",
+            'message' => "A new report of {$this->report->repository->slug} is in progress"
+        ]);
     }
 }

@@ -6,11 +6,14 @@ use App\User;
 use Exception;
 use App\Report;
 use App\Repository;
+use App\ReportSearch;
+
+use App\ReportProgress;
 use App\Jobs\MakeCodeReport;
 
 use Illuminate\Http\Request;
+use App\Events\ReportFinished;
 use App\Jobs\MakeIssuesReport;
-
 use App\Helpers\GithubApiClient;
 use App\Notifications\ReportEnded;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +23,6 @@ use App\Notifications\ReportStarted;
 use App\Services\GithubRepositoryService;
 use App\Helpers\Constants\ReportProgressType;
 use App\Exceptions\RepositoryNotFoundException;
-use App\ReportProgress;
 
 class ReportsController extends Controller
 {
@@ -49,6 +51,16 @@ class ReportsController extends Controller
 
         try {
             $repository = $this->getOrCreateRepository($request->name, $request->owner);
+
+            $searches = $repository->searches;
+
+            if ($searches) {
+                $repository->searches()->update([
+                    'total' => $searches->total + 1
+                ]);
+            } else {
+                $repository->searches()->create();
+            }
 
             $reports = $repository->reports()->latest()->take(5)->get();
 
@@ -137,6 +149,13 @@ class ReportsController extends Controller
         return response()->json($user->reports()->with('repository')->get());
     }
 
+    public function popularReports(Request $request)
+    {
+        $mostSearched = ReportSearch::orderBy('total', 'desc')->with('repository')->take(12)->get();
+
+        return response()->json($mostSearched);
+    }
+
     private function getOrCreateRepository(string $name, string $owner): Repository
     {
         $repository = Repository::where('name', $name)->where('owner', $owner)->first();
@@ -179,6 +198,7 @@ class ReportsController extends Controller
                 $progress->delete();
 
                 $user->notify(new ReportEnded($report));
+                event(new ReportFinished($report));
             }
         ])->dispatch($repository, $report, $repositoryMetrics->issues->totalCount);
 
