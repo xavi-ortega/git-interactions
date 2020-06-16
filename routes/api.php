@@ -14,13 +14,13 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::post('login', 'UsersController@login');
+Route::post('login', 'UsersController@login')->name('login');
 Route::post('register', 'UsersController@register');
 
 Route::group(['middleware' => 'auth:sanctum'], function () {
     Route::get('user/lastReports', 'ReportsController@lastUserReports');
     Route::get('user/notifications', 'UsersController@notifications');
-    Route::post('user/notifications/{notification}', 'UserController@notificationVisited');
+    Route::post('user/notifications/{notification}', 'UsersController@notificationVisited');
 
     Route::post('report/search', 'ReportsController@search');
     Route::get('report/popular', 'ReportsController@popularReports');

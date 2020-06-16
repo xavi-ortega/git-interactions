@@ -33,7 +33,7 @@ class ReportEnded extends Notification
      */
     public function via($notifiable)
     {
-        return ['database'];
+        return ['database', 'broadcast'];
     }
 
     /**
@@ -66,7 +66,7 @@ class ReportEnded extends Notification
     public function toDatabase($notifiable)
     {
         return [
-            'url' => "reports/{$this->report->repository->slug}/{$this->report->id}",
+            'url' => "report/{$this->report->repository->slug}/{$this->report->id}",
             'message' => "The report of {$this->report->repository->slug} has just finished"
         ];
     }

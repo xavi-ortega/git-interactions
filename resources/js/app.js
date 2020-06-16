@@ -77,5 +77,15 @@ const app = new Vue({
     },
     computed: {
         ...mapGetters(["isLogged"])
+    },
+
+    methods: {
+        search() {
+            $("#search").modal("show");
+        },
+
+        logout() {
+            this.$store.dispatch("logout");
+        }
     }
 });

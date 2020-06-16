@@ -90,8 +90,6 @@ class ReportsController extends Controller
 
             $report = $this->dispatchReport($user, $repository);
 
-            $user->notify(new ReportStarted($report));
-
             return response()->json([
                 'message' => 'Your report is in progress',
                 'report' => $report
@@ -187,6 +185,8 @@ class ReportsController extends Controller
             'type' => ReportProgressType::WAITING,
             'progress' => 0
         ]);
+
+        $user->notify(new ReportStarted($report));
 
         MakeIssuesReport::withChain([
             new MakePullRequestsReport($repository, $report, $repositoryMetrics->pullRequests->totalCount),

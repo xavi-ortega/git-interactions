@@ -4,10 +4,10 @@ export const NotificationService = {
     },
 
     visit(id) {
-        return axions.post(`user/notifications/${id}`);
+        return axios.post(`user/notifications/${id}`);
     },
 
     listen(user, callback) {
-        return Echo.private(`App.User.${user.id}`).notification(callback);
+        Echo.private(`App.User.${user.id}`).notification(callback);
     }
 };

@@ -1,6 +1,6 @@
 export const ReportProgressService = {
     connectReportProgress(id, onProgress, onEnded) {
-        return window.Echo.channel(`report-progress-${id}`)
+        window.Echo.channel(`report-progress-${id}`)
             .listen(".progress.updated", onProgress)
             .listen(".progress.finished", onEnded);
     },
@@ -10,10 +10,7 @@ export const ReportProgressService = {
     },
 
     connectQueue(callback) {
-        return window.Echo.channel("general-queue").listen(
-            ".queue.updated",
-            callback
-        );
+        window.Echo.channel("general-queue").listen(".queue.updated", callback);
     },
 
     disconnectQueue() {

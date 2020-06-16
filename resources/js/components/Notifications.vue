@@ -11,9 +11,9 @@
       <i class="fa fa-bell"></i>
     </button>
     <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
-      <a
+      <button
         href="#"
-        class="dropdown-item"
+        class="btn-link dropdown-item"
         v-for="notification in notifications"
         :key="notification.id"
         @click="visit(notification)"
@@ -21,21 +21,24 @@
         <i class="fa fa-eye" v-if="!notification.read_at"></i>
         <i class="fa fa-eye-closed" v-else></i>
         {{ notification.data.message }}
-      </a>
+      </button>
     </div>
   </div>
 </template>
 
 <script>
 import { NotificationService } from "../services/notification-service";
+import { mapGetters } from "vuex";
 export default {
   mounted() {
+    const user = this.getUser;
+
     NotificationService.fetchAll().then(
       ({ data }) => (this.notifications = data)
     );
 
-    NotificationService.listen(notification => {
-      console.log("WS -> notification");
+    NotificationService.listen(user, notification => {
+      console.log("WS -> notification", notification);
       this.notifications = [...this.notifications, notification];
     });
   },
@@ -51,6 +54,8 @@ export default {
       this.$router.push({ path: `/${notification.data.url}` });
       NotificationService.visit(notification.id);
     }
-  }
+  },
+
+  computed: { ...mapGetters(["getUser"]) }
 };
 </script>
