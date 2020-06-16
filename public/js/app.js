@@ -105889,7 +105889,8 @@ try {
 
 window.axios = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
 window.axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
-axios.defaults.baseURL = "http://localhost:8000/api";
+axios.defaults.baseURL = "https://app.gitinteractions.tech/api"; // axios.defaults.baseURL = "https://localhost:8000/api";
+
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
  * for events that are broadcast by Laravel. Echo and event broadcasting

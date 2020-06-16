@@ -23,7 +23,8 @@ window.axios = require("axios");
 
 window.axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 
-axios.defaults.baseURL = "http://localhost:8000/api";
+axios.defaults.baseURL = "https://app.gitinteractions.tech/api";
+// axios.defaults.baseURL = "https://localhost:8000/api";
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
