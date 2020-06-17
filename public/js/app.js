@@ -105836,9 +105836,10 @@ var app = new Vue({
       broadcaster: "pusher",
       key: "mykey",
       cluster: "mt1",
-      encrypted: false,
+      encrypted: true,
       wsHost: window.location.hostname,
       wsPort: 6001,
+      wssPort: 6001,
       disableStats: true,
       auth: {
         headers: {
