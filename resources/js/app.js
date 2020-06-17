@@ -67,6 +67,7 @@ const app = new Vue({
             encrypted: true,
             wsHost: window.location.hostname,
             wsPort: 6001,
+            wssPort: 6001,
             disableStats: true,
             auth: {
                 headers: {
