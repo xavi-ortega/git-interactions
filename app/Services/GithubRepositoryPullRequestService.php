@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Helpers\GithubApiClient;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\ReportProgressManager;
@@ -31,19 +32,21 @@ class GithubRepositoryPullRequestsService
         $after = null;
 
         for ($i = 1; $i < $pages; $i++) {
-            $paginatedPullRequests = $this->github->getRepositoryPullRequestsPaginated([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => MAX_PULL_REQUESTS,
-                'after' => $after
-            ]);
+            try {
+                $paginatedPullRequests = $this->github->getRepositoryPullRequestsPaginated([
+                    'name' => $name,
+                    'owner' => $owner,
+                    'first' => MAX_PULL_REQUESTS,
+                    'after' => $after
+                ]);
 
-            $repositoryPullRequests->add(
-                $paginatedPullRequests->nodes
-            );
+                $repositoryPullRequests->add(
+                    $paginatedPullRequests->nodes
+                );
 
-            $after = $paginatedPullRequests->pageInfo->endCursor;
-
+                $after = $paginatedPullRequests->pageInfo->endCursor;
+            } catch (Exception $e) {
+            }
 
             $progress = $this->map($i, 1, $pages, 1, 90);
             $manager->setProgress($progress);
@@ -51,18 +54,21 @@ class GithubRepositoryPullRequestsService
             Log::debug($i . ' of ' . $pages . ' pages of pullRequests');
         }
 
-        $paginatedPullRequests = $this->github->getRepositoryPullRequestsPaginated([
-            'name' => $name,
-            'owner' => $owner,
-            'first' => $lastPageCount,
-            'after' => $after
-        ]);
+        try {
+            $paginatedPullRequests = $this->github->getRepositoryPullRequestsPaginated([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => $lastPageCount,
+                'after' => $after
+            ]);
 
-        $repositoryPullRequests->add(
-            $paginatedPullRequests->nodes
-        );
+            $repositoryPullRequests->add(
+                $paginatedPullRequests->nodes
+            );
 
-        $repositoryPullRequests->setEndCursor($paginatedPullRequests->pageInfo->endCursor);
+            $repositoryPullRequests->setEndCursor($paginatedPullRequests->pageInfo->endCursor);
+        } catch (Exception $e) {
+        }
 
         Log::debug($i . ' of ' . $pages . ' pages of pullRequests');
 

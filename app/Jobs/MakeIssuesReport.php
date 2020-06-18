@@ -2,24 +2,29 @@
 
 namespace App\Jobs;
 
-use App\Helpers\Constants\ReportProgressType;
+use Exception;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
 use App\Repository;
+use App\Events\ReportFailed;
 use Illuminate\Bus\Queueable;
+use App\Helpers\ReportProgressManager;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use App\Helpers\GithubRepositoryActions;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Helpers\GithubRepositoryActions;
-use App\Helpers\ReportProgressManager;
+use App\Helpers\Constants\ReportProgressType;
 use App\Services\GithubRepositoryIssueService;
 
 class MakeIssuesReport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 3600;
+    public $tries = 2;
 
     private $repository;
     private $report;
@@ -143,6 +148,22 @@ class MakeIssuesReport implements ShouldQueue
 
         // END PROGRESS
         $manager->setProgress(100);
+    }
+
+    /**
+     * The job failed to process.
+     *
+     * @param  Exception  $exception
+     * @return void
+     */
+    public function failed($exception)
+    {
+        // Without observer event
+        $this->report->progress()->delete();
+
+        event(new ReportFailed($this->report->id));
+
+        $this->report->update(['status' => 'failed']);
     }
 
     private function map($x, $in_min, $in_max, $out_min, $out_max)

@@ -22,11 +22,14 @@ class GithubApiClient
     private $client;
 
     /**
-     * guzzle client for http requests
+     * number of tries of every failed request
      *
-     * @var GuzzleHttp\Client
+     * @var int
      */
-    private $guzzleClient;
+    private $tries;
+
+
+
 
 
     public function __construct()
@@ -40,14 +43,7 @@ class GithubApiClient
 
         );
 
-        $this->guzzleClient = new GuzzleClient([
-            'base_uri' => 'https://api.github.com',
-            'headers' => [
-                'Authorization' => 'Bearer ' . env('GITHUB_ACCESS_TOKEN'),
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/vnd.github.v3+json'
-            ]
-        ]);
+        $this->tries = 5;
     }
 
     /**
@@ -620,48 +616,23 @@ class GithubApiClient
      */
     private function runRaw($query, $params = [])
     {
-        try {
-            return $this->client->runRawQuery($query, false, $params);
-        } catch (\Exception $e) {
-            Log::error('error graphql retry 1');
-            sleep(1);
+        $tries = 0;
 
+        while ($tries < $this->tries) {
             try {
                 return $this->client->runRawQuery($query, false, $params);
             } catch (\Exception $e) {
-                Log::error('error graphql retry 2');
+                $tries++;
+
+                Log::error('error graphql retry ' . $tries);
                 sleep(1);
-
-                try {
-                    return $this->client->runRawQuery($query, false, $params);
-                } catch (\Exception $e) {
-                    try {
-                        return $this->client->runRawQuery($query, false, $params);
-                    } catch (\Exception $e) {
-                        Log::error('error graphql retry 3');
-                        sleep(1);
-
-                        try {
-                            return $this->client->runRawQuery($query, false, $params);
-                        } catch (\Exception $e) {
-                            try {
-                                return $this->client->runRawQuery($query, false, $params);
-                            } catch (\Exception $e) {
-                                Log::error('error graphql retry 4');
-                                sleep(1);
-
-                                try {
-                                    return $this->client->runRawQuery($query, false, $params);
-                                } catch (\Exception $e) {
-                                    Log::error('error graphql');
-                                    Log::error($query);
-                                    Log::error($params);
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
+
+        Log::error('error graphql');
+        Log::error($query);
+        Log::error($params);
+
+        return null;
     }
 }

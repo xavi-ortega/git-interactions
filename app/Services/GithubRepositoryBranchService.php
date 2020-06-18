@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Helpers\GithubApiClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -32,10 +33,32 @@ class GithubRepositoryBranchService
         $after = null;
 
         for ($i = 1; $i < $pages; $i++) {
+            try {
+                $paginatedBranches = $this->github->getRepositoryBranchesPaginated([
+                    'name' => $name,
+                    'owner' => $owner,
+                    'first' => MAX_BRANCHES,
+                    'after' => $after
+                ]);
+
+                $repositoryBranches->add(
+                    $paginatedBranches->nodes
+                );
+
+                $after = $paginatedBranches->pageInfo->endCursor;
+            } catch (Exception $e) {
+            }
+
+            $progress = $this->map($i, 1, $pages, 1, 50);
+            $manager->setProgress($progress);
+
+            Log::debug($i . ' of ' . $pages . ' pages of branches');
+        }
+        try {
             $paginatedBranches = $this->github->getRepositoryBranchesPaginated([
                 'name' => $name,
                 'owner' => $owner,
-                'first' => MAX_BRANCHES,
+                'first' => $lastPageCount,
                 'after' => $after
             ]);
 
@@ -43,26 +66,9 @@ class GithubRepositoryBranchService
                 $paginatedBranches->nodes
             );
 
-            $after = $paginatedBranches->pageInfo->endCursor;
-
-            $progress = $this->map($i, 1, $pages, 1, 50);
-            $manager->setProgress($progress);
-
-            Log::debug($i . ' of ' . $pages . ' pages of branches');
+            $repositoryBranches->setEndCursor($paginatedBranches->pageInfo->endCursor);
+        } catch (Exception $e) {
         }
-
-        $paginatedBranches = $this->github->getRepositoryBranchesPaginated([
-            'name' => $name,
-            'owner' => $owner,
-            'first' => $lastPageCount,
-            'after' => $after
-        ]);
-
-        $repositoryBranches->add(
-            $paginatedBranches->nodes
-        );
-
-        $repositoryBranches->setEndCursor($paginatedBranches->pageInfo->endCursor);
 
         Log::debug($i . ' of ' . $pages . ' pages of branches');
 

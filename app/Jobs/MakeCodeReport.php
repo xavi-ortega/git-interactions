@@ -2,11 +2,13 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
 use App\Repository;
 use Illuminate\Support\Str;
+use App\Events\ReportFailed;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\ReportProgressManager;
@@ -26,6 +28,9 @@ const IGNORED_FILES = [
 class MakeCodeReport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 3600;
+    public $tries = 2;
 
     private $repository;
     private $report;
@@ -199,6 +204,22 @@ class MakeCodeReport implements ShouldQueue
         $progress->update([
             'progress' => 100
         ]);
+    }
+
+    /**
+     * The job failed to process.
+     *
+     * @param  Exception  $exception
+     * @return void
+     */
+    public function failed($exception)
+    {
+        // Without observer event
+        $this->report->progress()->delete();
+
+        event(new ReportFailed($this->report->id));
+
+        $this->report->update(['status' => 'failed']);
     }
 
     private function map($x, $in_min, $in_max, $out_min, $out_max)

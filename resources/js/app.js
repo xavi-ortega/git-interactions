@@ -69,6 +69,7 @@ const app = new Vue({
             wsPort: 6001,
             wssPort: 6001,
             disableStats: true,
+            enabledTransports: ["ws", "wss"],
             auth: {
                 headers: {
                     Authorization: `Bearer ${userData.token}`

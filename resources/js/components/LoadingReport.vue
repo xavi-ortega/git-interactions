@@ -2,20 +2,22 @@
   <div class="wrapper">
     <div class="row">
       <div class="col">
-        <h2 class="text-center my-5">{{ report.repository.slug }}</h2>
+        <h2 class="text-center">{{ report.repository.slug }}</h2>
       </div>
     </div>
 
     <div class="row">
       <div class="col-6 offset-3">
-        <div class="progress my-2">
+        <div class="progress mt-5 mb-4">
           <div
-            class="progress-bar"
-            :style="{ width: report.progress.progress + '%' }"
+            class="progress-ball"
+            :style="progressStyle"
             :aria-valuenow="report.progress.progress"
             aria-valuemin="0"
             aria-valuemax="100"
           ></div>
+
+          <div class="progress-bar" :style="{ width: report.progress.progress + '%'}"></div>
         </div>
         <p class="text-center">{{ feedback }}</p>
       </div>
@@ -51,7 +53,8 @@ export default {
     ReportProgressService.connectReportProgress(
       this.report.id,
       this.onReportProgress,
-      this.onReportEnded
+      this.onReportEnded,
+      this.onReportFailed
     );
   },
 
@@ -82,7 +85,14 @@ export default {
       console.log("WS -> progress ended");
       ReportProgressService.disconnectReportProgress(this.report.id);
 
-      this.$router.go();
+      this.$store.dispatch("fetchReport", { id: to.params.id });
+    },
+
+    onReportFailed() {
+      console.err("WE -> report failed");
+      ReportProgressService.disconnectReportProgress(this.report.id);
+
+      this.$router.push({ name: "Home" });
     }
   },
 
@@ -119,6 +129,13 @@ export default {
       } else {
         return 0;
       }
+    },
+
+    progressStyle() {
+      const right = 100 - this.report.progress.progress;
+      return {
+        right: `${right}%`
+      };
     }
   }
 };

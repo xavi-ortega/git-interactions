@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Events\ReportFailed;
+use Exception;
 use App\Report;
 use DateInterval;
 use Carbon\Carbon;
@@ -20,6 +22,9 @@ use App\Services\GithubRepositoryPullRequestsService;
 class MakePullRequestsReport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 3600;
+    public $tries = 2;
 
     private $repository;
     private $report;
@@ -162,6 +167,22 @@ class MakePullRequestsReport implements ShouldQueue
 
         // END PROGRESS
         $manager->setProgress(100);
+    }
+
+    /**
+     * The job failed to process.
+     *
+     * @param  Exception  $exception
+     * @return void
+     */
+    public function failed($exception)
+    {
+        // Without observer event
+        $this->report->progress()->delete();
+
+        event(new ReportFailed($this->report->id));
+
+        $this->report->update(['status' => 'failed']);
     }
 
     private function map($x, $in_min, $in_max, $out_min, $out_max)

@@ -6,6 +6,7 @@ use App\Helpers\GithubApiClient;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\GithubRepositoryIssues;
 use App\Helpers\ReportProgressManager;
+use Exception;
 
 const MAX_ISSUES = 100;
 
@@ -30,18 +31,21 @@ class GithubRepositoryIssueService
         $after = null;
 
         for ($i = 1; $i < $pages; $i++) {
-            $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
-                'name' => $name,
-                'owner' => $owner,
-                'first' => MAX_ISSUES,
-                'after' => $after
-            ]);
+            try {
+                $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
+                    'name' => $name,
+                    'owner' => $owner,
+                    'first' => MAX_ISSUES,
+                    'after' => $after
+                ]);
 
-            $repositoryIssues->add(
-                $paginatedIssues->nodes
-            );
+                $repositoryIssues->add(
+                    $paginatedIssues->nodes
+                );
 
-            $after = $paginatedIssues->pageInfo->endCursor;
+                $after = $paginatedIssues->pageInfo->endCursor;
+            } catch (Exception $e) {
+            }
 
             $progress = $this->map($i, 1, $pages, 1, 90);
             $manager->setProgress($progress);
@@ -49,18 +53,21 @@ class GithubRepositoryIssueService
             Log::debug($i . ' of ' . $pages . ' pages of issues');
         }
 
-        $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
-            'name' => $name,
-            'owner' => $owner,
-            'first' => $lastPageCount,
-            'after' => $after
-        ]);
+        try {
+            $paginatedIssues = $this->github->getRepositoryIssuesPaginated([
+                'name' => $name,
+                'owner' => $owner,
+                'first' => $lastPageCount,
+                'after' => $after
+            ]);
 
-        $repositoryIssues->add(
-            $paginatedIssues->nodes
-        );
+            $repositoryIssues->add(
+                $paginatedIssues->nodes
+            );
 
-        $repositoryIssues->setEndCursor($paginatedIssues->pageInfo->endCursor);
+            $repositoryIssues->setEndCursor($paginatedIssues->pageInfo->endCursor);
+        } catch (Exception $e) {
+        }
 
         Log::debug($i . ' of ' . $pages . ' pages of issues');
 

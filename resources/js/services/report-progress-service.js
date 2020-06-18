@@ -1,8 +1,9 @@
 export const ReportProgressService = {
-    connectReportProgress(id, onProgress, onEnded) {
+    connectReportProgress(id, onProgress, onEnded, onFailed) {
         window.Echo.channel(`report-progress-${id}`)
             .listen(".progress.updated", onProgress)
-            .listen(".progress.finished", onEnded);
+            .listen(".progress.finished", onEnded)
+            .listen(".progress.failed", onFailed);
     },
 
     disconnectReportProgress(id) {

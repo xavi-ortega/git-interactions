@@ -4,8 +4,12 @@
       <loading-report :report="report"></loading-report>
     </div>
 
-    <div class="container" v-if="report && !inProgress()">
+    <div class="container" v-else-if="isFinished()">
       <report :report="report"></report>
+    </div>
+
+    <div class="container" v-else-if="isFailed()">
+      <failed-report></failed-report>
     </div>
   </div>
 </template>
@@ -23,7 +27,15 @@ export default {
 
   methods: {
     inProgress() {
-      return this.report && this.report.progress;
+      return this.report && this.report.status === "loading";
+    },
+
+    isFailed() {
+      return this.report && this.report.status === "failed";
+    },
+
+    isFinished() {
+      return this.report && this.report.status === "finished";
     }
   },
 

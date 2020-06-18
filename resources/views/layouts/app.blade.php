@@ -21,6 +21,7 @@
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
     <link href="{{ asset('css/components.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/animate.css@3.5.1" rel="stylesheet" type="text/css">
 </head>
 
 <body>
@@ -48,7 +49,7 @@
                 <!-- Right Side Of Navbar -->
                 <ul class="navbar-nav ml-auto">
                     <div class="btn-group">
-                        <button type="button" class="btn btn-link" @click="logout">
+                        <button type="button" class="btn btn-outline-secondary" @click="logout">
                             Logout
                         </button>
 
@@ -63,7 +64,23 @@
             @yield('content')
         </main>
 
-        <footer></footer>
+        <footer>
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-6 col-sm-12 text-left">
+                        <p>
+                            &copy; GitInteractions by
+                            <a href="https://github.com/xavi-ortega" title="Find me on Github" target="_blank">Xavi Ortega</a>
+                        </p>
+                    </div>
+
+                    <div class="col-md-6 col-sm-12 text-right">
+                        <p>Terms & Conditions | Privacy Policy | Supports | Cookies Policy</p>
+                    </div>
+                </div>
+            </div>
+
+        </footer>
         <search></search>
     </div>
 </body>

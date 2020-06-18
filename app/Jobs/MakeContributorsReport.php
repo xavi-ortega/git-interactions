@@ -7,6 +7,7 @@ use App\Report;
 use Carbon\Carbon;
 use App\Repository;
 use Cz\Git\GitException;
+use App\Events\ReportFailed;
 use Illuminate\Bus\Queueable;
 use App\Helpers\GitRepository;
 use App\Services\GitCommitService;
@@ -25,6 +26,9 @@ use App\Helpers\Constants\ReportProgressType;
 class MakeContributorsReport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 3600;
+    public $tries = 2;
 
     private $repository;
     private $report;
@@ -136,6 +140,22 @@ class MakeContributorsReport implements ShouldQueue
 
         // END PROGRESS
         $manager->setProgress(100);
+    }
+
+    /**
+     * The job failed to process.
+     *
+     * @param  Exception  $exception
+     * @return void
+     */
+    public function failed(Exception $exception)
+    {
+        // Without observer event
+        $this->report->progress()->delete();
+
+        event(new ReportFailed($this->report->id));
+
+        $this->report->update(['status' => 'failed']);
     }
 
     private function getFilesPerCommit(Collection $actions): Collection

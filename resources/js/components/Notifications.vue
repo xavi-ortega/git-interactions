@@ -1,14 +1,14 @@
 <template>
   <div class="dropdown mr-2">
     <button
-      class="btn btn-secondary dropdown-toggle"
+      class="btn btn-link"
       type="button"
       id="dropdownMenuButton"
       data-toggle="dropdown"
-      aria-haspopup="true"
       aria-expanded="false"
     >
-      <i class="fa fa-bell"></i>
+      <img src="../../img/campana.png" width="29px" height="29px" alt="Notifications" />
+      <span class="badge badge-danger text-white" v-if="unread > 0">{{ unread }}</span>
     </button>
     <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
       <button
@@ -39,7 +39,10 @@ export default {
 
     NotificationService.listen(user, notification => {
       console.log("WS -> notification", notification);
-      this.notifications = [...this.notifications, notification];
+      this.notifications = [
+        { id: new Date().getTime(), data: notification },
+        ...this.notifications
+      ];
     });
   },
 
@@ -52,10 +55,17 @@ export default {
   methods: {
     visit(notification) {
       this.$router.push({ path: `/${notification.data.url}` });
+      notification.read_at = true;
       NotificationService.visit(notification.id);
     }
   },
 
-  computed: { ...mapGetters(["getUser"]) }
+  computed: {
+    ...mapGetters(["getUser"]),
+    unread() {
+      return this.notifications.filter(notification => !notification.read_at)
+        .length;
+    }
+  }
 };
 </script>

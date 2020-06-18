@@ -109,7 +109,8 @@ class ReportsController extends Controller
             'repository' => $report->repository,
             'report' => [
                 'id' => $report->id,
-                'progress' => null
+                'progress' => null,
+                'status' => $report->status,
             ],
             'issues' => $report->issues,
             'pullRequests' => $report->pull_requests,
@@ -144,12 +145,12 @@ class ReportsController extends Controller
     {
         $user = $request->user();
 
-        return response()->json($user->reports()->with('repository')->get());
+        return response()->json($user->reports()->with('repository')->has('issues')->has('pull_requests')->has('contributors')->has('code')->get());
     }
 
     public function popularReports(Request $request)
     {
-        $mostSearched = ReportSearch::orderBy('total', 'desc')->with('repository')->take(12)->get();
+        $mostSearched = ReportSearch::orderBy('total', 'desc')->with('repository')->has('repository.latest_report')->take(12)->get();
 
         return response()->json($mostSearched);
     }
@@ -196,6 +197,7 @@ class ReportsController extends Controller
                 $progress = $report->progress;
 
                 $progress->delete();
+                $report->update(['status' => 'finished']);
 
                 $user->notify(new ReportEnded($report));
                 event(new ReportFinished($report));
