@@ -8,7 +8,14 @@
     <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Laravel') }}</title>
+    <title>The solution to improve your team's performance - GitInteractions</title>
+
+    <meta name="description" content="Witness how open source software companies work. GitInteractions encourages all software developers to follow the guidelines and good practices of teamwork. Given the metrics, the strengths and the weaknesses of the team." />
+
+    <link rel="icon" type="image/png" href="/images/favicon/32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/images/favicon/48x48.png" sizes="48x48" />
+    <link rel="icon" type="image/png" href="/images/favicon/96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/png" href="/images/favicon/144x144.png" sizes="144x144" />
 
     <!-- Scripts -->
     <script src="{{ asset('js/app.js') }}" defer></script>
