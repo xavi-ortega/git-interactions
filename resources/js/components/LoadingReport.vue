@@ -85,7 +85,7 @@ export default {
       console.log("WS -> progress ended");
       ReportProgressService.disconnectReportProgress(this.report.id);
 
-      this.$store.dispatch("fetchReport", { id: to.params.id });
+      this.$store.dispatch("fetchReport", { id: this.report.id });
     },
 
     onReportFailed() {

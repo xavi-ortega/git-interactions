@@ -47,7 +47,7 @@
                 </form>
 
                 <!-- Right Side Of Navbar -->
-                <ul class="navbar-nav ml-auto">
+                <ul class="navbar-nav">
                     <div class="btn-group">
                         <button type="button" class="btn btn-outline-secondary" @click="logout">
                             Logout
