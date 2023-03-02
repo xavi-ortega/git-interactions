@@ -10,7 +10,7 @@ use App\Helpers\GithubRepositoryPullRequests;
 
 const MAX_PULL_REQUESTS = 90;
 
-class GithubRepositoryPullRequestsService
+class GithubRepositoryPullRequestService
 {
 
     private $github;

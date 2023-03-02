@@ -88,8 +88,8 @@ export default {
       this.$store.dispatch("fetchReport", { id: this.report.id });
     },
 
-    onReportFailed() {
-      console.err("WE -> report failed");
+    onReportFailed(e) {
+      console.error("WE -> report failed", e);
       ReportProgressService.disconnectReportProgress(this.report.id);
 
       this.$router.push({ name: "Home" });

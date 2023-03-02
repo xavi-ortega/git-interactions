@@ -81,7 +81,11 @@ class MakeContributorsReport implements ShouldQueue
 
         $manager->setProgress(20);
 
-        $cloned->checkout('master');
+        try {
+            $cloned->checkout('master');
+        } catch (Exception $e) {
+            $cloned->checkout('main');
+        }
 
         $manager->setProgress(21);
 
@@ -89,7 +93,11 @@ class MakeContributorsReport implements ShouldQueue
 
         $manager->setProgress(24);
 
-        $commitCount = $cloned->getCommitCount('master');
+        try {
+            $commitCount = $cloned->getCommitCount('master');
+        } catch (Exception $e) {
+            $commitCount = $cloned->getCommitCount('main');
+        }
 
         $manager->setProgress(25);
 

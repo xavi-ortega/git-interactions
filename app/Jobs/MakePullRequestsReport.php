@@ -17,7 +17,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Helpers\Constants\ReportProgressType;
-use App\Services\GithubRepositoryPullRequestsService;
+use App\Services\GithubRepositoryPullRequestService;
 
 class MakePullRequestsReport implements ShouldQueue
 {
@@ -40,7 +40,7 @@ class MakePullRequestsReport implements ShouldQueue
         $this->repository = $repository;
         $this->report = $report;
         $this->totalPullRequests = $totalPullRequests;
-        $this->pullRequestService = new GithubRepositoryPullRequestsService();
+        $this->pullRequestService = new GithubRepositoryPullRequestService();
     }
 
     /**
@@ -48,7 +48,7 @@ class MakePullRequestsReport implements ShouldQueue
      *
      * @return void
      */
-    public function handle(GithubRepositoryPullRequestsService $pullRequestService)
+    public function handle(GithubRepositoryPullRequestService $pullRequestService)
     {
         // START PROGRESS
         $progress = $this->report->progress;

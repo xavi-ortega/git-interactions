@@ -64,7 +64,7 @@ const app = new Vue({
             broadcaster: "pusher",
             key: process.env.MIX_PUSHER_APP_KEY,
             cluster: process.env.MIX_PUSHER_APP_CLUSTER,
-            encrypted: true,
+            encrypted: process.env.MIX_APP_ENV === "production",
             wsHost: window.location.hostname,
             wsPort: 6001,
             wssPort: 6001,
