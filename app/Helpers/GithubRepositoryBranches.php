@@ -43,7 +43,7 @@ class GithubRepositoryBranches
     private function formatBranches(array $rawBranches)
     {
         return array_map(function ($branch) {
-            $lastActivity = count($branch->commits->history->nodes) > 0 ? Carbon::make($branch->commits->history->nodes[0]->pushedDate)->diffForHumans() : null;
+            $lastActivity = count($branch->commits->history->nodes) > 0 ? Carbon::make($branch->commits->history->nodes[0]->committedDate)->diffForHumans() : null;
 
             return (object) [
                 'name' => $branch->name,

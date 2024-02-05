@@ -409,7 +409,7 @@ class GithubApiClient
                                 history (first: 1) {
                                     totalCount,
                                     nodes {
-                                      pushedDate
+                                      committedDate
                                     }
                                 }
                             }
@@ -447,7 +447,7 @@ class GithubApiClient
                                 history (first: 1) {
                                     totalCount,
                                     nodes {
-                                      pushedDate
+                                      committedDate
                                     }
                                 }
                             }
@@ -481,11 +481,10 @@ class GithubApiClient
                                 nodes {
                                     oid,
                                     url,
-                                    changedFiles,
+                                    changedFilesIfAvailable,
                                     additions,
                                     deletions,
                                     committedDate,
-                                    pushedDate,
                                     author {
                                         name
                                         user {
@@ -532,11 +531,10 @@ class GithubApiClient
                                 nodes {
                                     oid,
                                     url,
-                                    changedFiles,
+                                    changedFilesIfAvailable ,
                                     additions,
                                     deletions,
                                     committedDate,
-                                    pushedDate,
                                     author {
                                         name
                                         user {
